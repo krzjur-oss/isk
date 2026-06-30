@@ -4,7 +4,9 @@ import DashboardStats from "./components/DashboardStats";
 import HardwareForm from "./components/HardwareForm";
 import HardwareList from "./components/HardwareList";
 import ReplacementManager from "./components/ReplacementManager";
-import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles } from "lucide-react";
+import AboutApp from "./components/AboutApp";
+import AdvancedFeatures from "./components/AdvancedFeatures";
+import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "it_inventory_items_v1";
 
@@ -107,7 +109,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
 
 export default function App() {
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"inventory" | "replacements">("inventory");
+  const [activeTab, setActiveTab] = useState<"inventory" | "replacements" | "about" | "improvements">("inventory");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   // Load items from local storage or use initial dataset
@@ -256,6 +258,30 @@ export default function App() {
             <RotateCw className="w-5 h-5" />
             <span>Procedury Wymiany</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("improvements")}
+            className={`w-full px-4 py-3 flex items-center gap-3 rounded transition-all text-left text-sm font-semibold cursor-pointer ${
+              activeTab === "improvements"
+                ? "bg-blue-600/20 border-r-4 border-blue-500 text-blue-400"
+                : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/40"
+            }`}
+          >
+            <Sparkles className="w-5 h-5" />
+            <span>Usprawnienia i Raporty</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("about")}
+            className={`w-full px-4 py-3 flex items-center gap-3 rounded transition-all text-left text-sm font-semibold cursor-pointer ${
+              activeTab === "about"
+                ? "bg-blue-600/20 border-r-4 border-blue-500 text-blue-400"
+                : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/40"
+            }`}
+          >
+            <Info className="w-5 h-5" />
+            <span>O programie i licencja</span>
+          </button>
         </nav>
 
         {/* System status display at bottom */}
@@ -274,7 +300,7 @@ export default function App() {
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
-              {activeTab === "inventory" ? "Ewidencja Urządzeń" : "Rotacja i Wymiany"}
+              {activeTab === "inventory" ? "Ewidencja Urządzeń" : activeTab === "replacements" ? "Rotacja i Wymiany" : activeTab === "improvements" ? "Usprawnienia i Raporty" : "O Programie i Regulamin"}
             </h1>
             <p className="text-xs text-slate-400 font-medium">
               Aktualizacja: Dzisiaj • {items.length} zarejestrowanych zasobów komputerowych
@@ -288,7 +314,7 @@ export default function App() {
                   setActiveTab("inventory");
                   setEditingItem(null);
                 }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded ${
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
                   activeTab === "inventory" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
                 }`}
               >
@@ -296,11 +322,27 @@ export default function App() {
               </button>
               <button
                 onClick={() => setActiveTab("replacements")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded ${
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
                   activeTab === "replacements" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
                 }`}
               >
                 Wymiany
+              </button>
+              <button
+                onClick={() => setActiveTab("improvements")}
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                  activeTab === "improvements" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
+                }`}
+              >
+                Usprawnienia
+              </button>
+              <button
+                onClick={() => setActiveTab("about")}
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                  activeTab === "about" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
+                }`}
+              >
+                O programie
               </button>
             </div>
 
@@ -359,11 +401,18 @@ export default function App() {
                 </div>
               </div>
             </div>
-          ) : (
+          ) : activeTab === "replacements" ? (
             <ReplacementManager
               items={items}
               onUpdateItems={saveItemsToDatabase}
             />
+          ) : activeTab === "improvements" ? (
+            <AdvancedFeatures
+              items={items}
+              onUpdateItems={saveItemsToDatabase}
+            />
+          ) : (
+            <AboutApp />
           )}
         </div>
       </main>

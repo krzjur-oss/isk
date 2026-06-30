@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar } from "lucide-react";
+import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar, Database } from "lucide-react";
 import { generateInventoryPDF } from "../utils/pdfGenerator";
 
 // Helper map to map CSV headers to InventoryItem keys (case-insensitive and Polish-compatible)
@@ -289,6 +289,26 @@ export default function HardwareList({ items, onEdit, onDelete, onImportItems }:
     document.body.removeChild(link);
   };
 
+  const handleExportJSON = () => {
+    try {
+      const backupData = JSON.stringify(items, null, 2);
+      const blob = new Blob([backupData], { type: "application/json;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      
+      const todayStr = new Date().toISOString().split("T")[0];
+      link.setAttribute("download", `kopia_zapasowa_inwentarza_${todayStr}.json`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      alert("Błąd podczas generowania pliku JSON kopii zapasowej.");
+    }
+  };
+
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -489,6 +509,15 @@ export default function HardwareList({ items, onEdit, onDelete, onImportItems }:
           >
             <FileSpreadsheet className="h-4.5 w-4.5" />
             Eksportuj CSV
+          </button>
+
+          <button
+            onClick={handleExportJSON}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-sm"
+            title="Pobierz pełną kopię zapasową wszystkich urządzeń w formacie JSON"
+          >
+            <Database className="h-4.5 w-4.5" />
+            Kopia zapasowa (JSON)
           </button>
           
           <button
