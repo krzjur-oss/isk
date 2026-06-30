@@ -2,14 +2,14 @@
   "name": "Inwentaryzacja Sprzętu Komputerowego",
   "short_name": "Inwentaryzacja",
   "description": "System inwentaryzacji i ewidencji sprzętu komputerowego dla szkół i placówek oświatowych.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon.jpg",
+      "src": "icon.jpg",
       "sizes": "512x512",
       "type": "image/jpeg",
       "purpose": "any maskable"

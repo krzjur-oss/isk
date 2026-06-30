@@ -1,9 +1,9 @@
 const CACHE_NAME = 'inwentaryzacja-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.jpg'
+  './',
+  'index.html',
+  'manifest.json',
+  'icon.jpg'
 ];
 
 // Install Event
@@ -78,7 +78,7 @@ self.addEventListener('fetch', (event) => {
             }
             // If the request is a navigation request (page refresh/navigation), serve index.html
             if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
+              return caches.match('index.html');
             }
           });
         })
