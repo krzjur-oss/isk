@@ -190,8 +190,17 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Serwer zwrócił błąd podczas analizy OCR.");
+        let errMsg = "Serwer zwrócił błąd podczas analizy OCR.";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errMsg = errData.error || errMsg;
+          } else {
+            errMsg = `Błąd połączenia (Status ${response.status}). Funkcja automatycznego odczytu OCR wymaga uruchomionego serwera backendu (np. na Render/Heroku/Cloud Run). Możesz nadal wpisać dane ręcznie.`;
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
       }
 
       const data = await response.json();
