@@ -1,7 +1,45 @@
 import { useState } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Search, Filter, Trash2, Edit, FileDown, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle } from "lucide-react";
+import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar } from "lucide-react";
 import { generateInventoryPDF } from "../utils/pdfGenerator";
+
+// Helper function to calculate usage duration from purchase date to today
+const calculateUsageYears = (purchaseDateStr: string | undefined): { years: number; text: string; isOver3Years: boolean } | null => {
+  if (!purchaseDateStr) return null;
+  const purchaseDate = new Date(purchaseDateStr);
+  if (isNaN(purchaseDate.getTime())) return null;
+  
+  const today = new Date();
+  const diffTime = today.getTime() - purchaseDate.getTime();
+  if (diffTime < 0) return { years: 0, text: "0 dni", isOver3Years: false };
+  
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const years = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+  
+  let text = "";
+  if (years >= 1) {
+    const fullYears = Math.floor(years);
+    const months = Math.floor((years - fullYears) * 12);
+    if (months > 0) {
+      text = `${fullYears} ${fullYears === 1 ? 'rok' : (fullYears < 5 ? 'lata' : 'lat')} i ${months} ${months === 1 ? 'miesiąc' : (months < 5 ? 'miesiące' : 'miesięcy')}`;
+    } else {
+      text = `${fullYears} ${fullYears === 1 ? 'rok' : (fullYears < 5 ? 'lata' : 'lat')}`;
+    }
+  } else {
+    const months = Math.floor(diffDays / 30.44);
+    if (months >= 1) {
+      text = `${months} ${months === 1 ? 'miesiąc' : (months < 5 ? 'miesiące' : 'miesięcy')}`;
+    } else {
+      text = `${diffDays} ${diffDays === 1 ? 'dzień' : 'dni'}`;
+    }
+  }
+  
+  return {
+    years,
+    text,
+    isOver3Years: years >= 3
+  };
+};
 
 interface HardwareListProps {
   items: InventoryItem[];
@@ -13,6 +51,7 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
+  const [onlyOver3Years, setOnlyOver3Years] = useState(false);
 
   // Filter items based on criteria
   const filteredItems = items.filter(item => {
@@ -27,8 +66,20 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
     const matchesStatus = selectedStatus === "All" || item.status === selectedStatus;
 
-    return matchesSearch && matchesCategory && matchesStatus;
+    let matchesOver3Years = true;
+    if (onlyOver3Years) {
+      const usage = calculateUsageYears(item.purchaseDate);
+      matchesOver3Years = item.status === "W użyciu" && (usage?.isOver3Years ?? false);
+    }
+
+    return matchesSearch && matchesCategory && matchesStatus && matchesOver3Years;
   });
+
+  const over3YearsItemsCount = items.filter(item => {
+    if (item.status !== "W użyciu") return false;
+    const usage = calculateUsageYears(item.purchaseDate);
+    return usage?.isOver3Years ?? false;
+  }).length;
 
   const getCategoryIcon = (category: HardwareCategory) => {
     switch (category) {
@@ -66,6 +117,83 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
       return;
     }
     generateInventoryPDF(filteredItems);
+  };
+
+  const handleExportCSV = () => {
+    if (filteredItems.length === 0) {
+      alert("Brak urządzeń do wygenerowania pliku CSV.");
+      return;
+    }
+
+    // Header row (semicolon is standard for European/Polish Excel versions)
+    const headers = [
+      "ID",
+      "Producent",
+      "Model",
+      "Numer seryjny (S/N)",
+      "Kategoria",
+      "Sala",
+      "Procesor",
+      "RAM",
+      "Dysk",
+      "Grafika",
+      "System operacyjny",
+      "Status",
+      "Data zakupu",
+      "Dodano",
+      "Modyfikowano",
+      "Zastępuje (ID)",
+      "Zastąpiony przez (ID)",
+      "Data wymiany",
+      "Notatki"
+    ];
+
+    const escapeCSV = (val: string | number | undefined | null) => {
+      if (val === undefined || val === null) return "";
+      const str = String(val);
+      const escaped = str.replace(/"/g, '""');
+      if (escaped.includes(";") || escaped.includes("\n") || escaped.includes("\r") || escaped.includes('"')) {
+        return `"${escaped}"`;
+      }
+      return escaped;
+    };
+
+    const rows = filteredItems.map(item => [
+      item.id,
+      item.manufacturer,
+      item.model,
+      item.serialNumber || "",
+      item.category,
+      item.room || "",
+      item.processor || "",
+      item.ram || "",
+      item.storage || "",
+      item.graphics || "",
+      item.operatingSystem || "",
+      item.status,
+      item.purchaseDate || "",
+      item.addedAt || "",
+      item.lastModifiedAt || "",
+      item.replacesItemId || "",
+      item.replacedByItemId || "",
+      item.replacementDate || "",
+      item.notes || ""
+    ]);
+
+    // Use BOM \uFEFF to preserve Polish characters in Excel
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(escapeCSV).join(";"))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    const todayStr = new Date().toISOString().split("T")[0];
+    link.setAttribute("download", `inwentarz_sprzetu_${todayStr}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -119,15 +247,52 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
           </div>
         </div>
 
-        {/* Action Button: Export PDF */}
-        <button
-          onClick={handleExportPDF}
-          className="bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-sm"
-        >
-          <FileDown className="h-4.5 w-4.5" />
-          Eksportuj PDF ({filteredItems.length})
-        </button>
+        {/* Action Buttons: Export CSV & PDF */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-sm"
+            title="Eksportuj listę do pliku CSV (arkusz kalkulacyjny)"
+          >
+            <FileSpreadsheet className="h-4.5 w-4.5" />
+            Eksportuj CSV
+          </button>
+          
+          <button
+            onClick={handleExportPDF}
+            className="bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-sm"
+            title="Pobierz protokół PDF"
+          >
+            <FileDown className="h-4.5 w-4.5" />
+            Eksportuj PDF ({filteredItems.length})
+          </button>
+        </div>
       </div>
+
+      {/* Warning banner for devices > 3 years in use */}
+      {over3YearsItemsCount > 0 && (
+        <div className="mx-4 mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-700 shrink-0">
+              <AlertTriangle className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <p className="font-bold text-amber-900">Zasoby powyżej 3 lat w użyciu</p>
+              <p className="text-amber-700/90 mt-0.5">Wykryto <strong className="text-amber-950 font-extrabold">{over3YearsItemsCount}</strong> {over3YearsItemsCount === 1 ? 'urządzenie' : (over3YearsItemsCount < 5 ? 'urządzenia' : 'urządzeń')} o statusie "W użyciu" użytkowane dłużej niż 3 lata. Zalecamy audyt techniczny lub zaplanowanie wymiany.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setOnlyOver3Years(!onlyOver3Years)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
+              onlyOver3Years 
+                ? "bg-amber-600 text-white hover:bg-amber-700 shadow-xs" 
+                : "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-200"
+            }`}
+          >
+            {onlyOver3Years ? "Pokaż wszystkie urządzenia" : "Filtruj stary sprzęt"}
+          </button>
+        </div>
+      )}
 
       {/* Main List Table */}
       <div className="overflow-x-auto">
@@ -207,6 +372,24 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
                             {item.operatingSystem}
                           </span>
                         )}
+                        {item.purchaseDate && (() => {
+                          const usage = calculateUsageYears(item.purchaseDate);
+                          if (!usage) return null;
+                          const isWarning = item.status === "W użyciu" && usage.isOver3Years;
+                          return (
+                            <span 
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                                isWarning 
+                                  ? "bg-amber-50 border-amber-200 text-amber-800 font-bold" 
+                                  : "bg-slate-50 border-slate-150 text-slate-600"
+                              }`}
+                              title={`Data zakupu: ${item.purchaseDate}`}
+                            >
+                              <Clock className="h-2.5 w-2.5 shrink-0" />
+                              {isWarning ? "⚠️ Wiek: " : "Wiek: "}{usage.text}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
 

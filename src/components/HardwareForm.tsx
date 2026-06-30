@@ -41,6 +41,7 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
   const [confidence, setConfidence] = useState(100);
   const [replacesItemId, setReplacesItemId] = useState("");
   const [room, setRoom] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
 
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -50,6 +51,7 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
   
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -127,6 +129,7 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
       setPhotoUrl(editingItem.photoUrl);
       setReplacesItemId(editingItem.replacesItemId || "");
       setRoom(editingItem.room || "");
+      setPurchaseDate(editingItem.purchaseDate || "");
       setOcrSuccess(false);
     } else {
       resetForm();
@@ -149,6 +152,7 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
     setPhotoUrl(undefined);
     setReplacesItemId("");
     setRoom("");
+    setPurchaseDate("");
     setOcrSuccess(false);
     setApiError("");
   };
@@ -259,14 +263,7 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!manufacturer.trim() || !model.trim()) {
-      setApiError("Pola Producent oraz Model są wymagane.");
-      return;
-    }
-
+  const executeSave = () => {
     onSave({
       id: editingItem?.id,
       manufacturer,
@@ -283,10 +280,27 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
       confidence,
       photoUrl,
       room: room || undefined,
-      replacesItemId: replacesItemId || undefined
+      replacesItemId: replacesItemId || undefined,
+      purchaseDate: purchaseDate || undefined
     });
 
     resetForm();
+    setShowConfirmModal(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!manufacturer.trim() || !model.trim()) {
+      setApiError("Pola Producent oraz Model są wymagane.");
+      return;
+    }
+
+    if (editingItem) {
+      setShowConfirmModal(true);
+    } else {
+      executeSave();
+    }
   };
 
   // Preset tester generator (mock/load image and trigger analyze)
@@ -656,23 +670,33 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Zastępuje urządzenie (opcjonalnie)</label>
-            <select
-              value={replacesItemId}
-              onChange={(e) => setReplacesItemId(e.target.value)}
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Data zakupu</label>
+            <input
+              type="date"
+              value={purchaseDate}
+              onChange={(e) => setPurchaseDate(e.target.value)}
               className="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-            >
-              <option value="">-- brak --</option>
-              {items
-                .filter(i => i.id !== editingItem?.id)
-                .map(i => (
-                  <option key={i.id} value={i.id}>
-                    {i.manufacturer} {i.model} ({i.serialNumber || "brak S/N"})
-                  </option>
-                ))
-              }
-            </select>
+            />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Zastępuje urządzenie (opcjonalnie)</label>
+          <select
+            value={replacesItemId}
+            onChange={(e) => setReplacesItemId(e.target.value)}
+            className="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+          >
+            <option value="">-- brak --</option>
+            {items
+              .filter(i => i.id !== editingItem?.id)
+              .map(i => (
+                <option key={i.id} value={i.id}>
+                  {i.manufacturer} {i.model} ({i.serialNumber || "brak S/N"})
+                </option>
+              ))
+            }
+          </select>
         </div>
 
         <div>
@@ -693,6 +717,41 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
           {editingItem ? "Zatwierdź zmiany" : "Zapisz do bazy danych"}
         </button>
       </form>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-100 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2.5 bg-amber-50 rounded-full text-amber-600 shrink-0">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Potwierdzenie zapisu zmian</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Czy na pewno chcesz nadpisać dane urządzenia <strong className="text-slate-700">{editingItem?.manufacturer} {editingItem?.model}</strong>? Poprzednie informacje zostaną zastąpione.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                onClick={executeSave}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
+              >
+                Tak, nadpisz dane
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

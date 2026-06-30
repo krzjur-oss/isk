@@ -25,6 +25,7 @@ export interface InventoryItem {
   replacesItemId?: string;   // ID of the old computer that THIS computer is replacing
   replacedByItemId?: string; // ID of the new computer that IS REPLACING this computer
   replacementDate?: string;  // Date of replacement
+  purchaseDate?: string;     // Purchase date e.g. "YYYY-MM-DD"
 }
 
 export interface ReplacementLog {

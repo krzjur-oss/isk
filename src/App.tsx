@@ -23,6 +23,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     confidence: 100,
     notes: "Stary laptop wycofany po wymianie na nowszy model Lenovo T14.",
     status: "Wycofany",
+    purchaseDate: "2020-03-15",
     addedAt: "2024-01-15",
     lastModifiedAt: "2026-06-30",
     replacedByItemId: "device-3",
@@ -42,6 +43,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     confidence: 95,
     notes: "Nowy laptop przygotowany w magazynie dla nowego pracownika.",
     status: "W magazynie",
+    purchaseDate: "2022-05-10",
     addedAt: "2026-03-10",
     lastModifiedAt: "2026-03-10"
   },
@@ -59,6 +61,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     confidence: 99,
     notes: "Wprowadzony jako następca dla wycofanego Della Latitude 5410.",
     status: "W użyciu",
+    purchaseDate: "2026-06-30",
     addedAt: "2026-06-30",
     lastModifiedAt: "2026-06-30",
     replacesItemId: "device-1",
@@ -78,8 +81,27 @@ const INITIAL_ITEMS: InventoryItem[] = [
     confidence: 100,
     notes: "Monitor 27 cali 4K IPS z hubem USB-C.",
     status: "W użyciu",
+    purchaseDate: "2021-02-14",
     addedAt: "2025-05-20",
     lastModifiedAt: "2025-05-20"
+  },
+  {
+    id: "device-5",
+    manufacturer: "HP",
+    model: "EliteDesk 800 G5",
+    serialNumber: "HP-800G5-ST",
+    processor: "Intel Core i7-9700",
+    ram: "16 GB",
+    storage: "512 GB SSD",
+    graphics: "Intel UHD Graphics 630",
+    operatingSystem: "Windows 10 Pro",
+    category: "Komputer Stacjonarny",
+    confidence: 100,
+    notes: "Komputer stacjonarny w pracowni komputerowej nr 12.",
+    status: "W użyciu",
+    purchaseDate: "2020-11-20",
+    addedAt: "2024-02-10",
+    lastModifiedAt: "2024-02-10"
   }
 ];
 
