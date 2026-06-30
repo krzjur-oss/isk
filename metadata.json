@@ -1,0 +1,6 @@
+{
+  "name": "Inwentaryzacja Sprzętu Komputerowego",
+  "description": "System inwentaryzacji sprzętu komputerowego z funkcją OCR i automatycznej kategoryzacji ze zdjęć, zarządzaniem wymianą urządzeń oraz generowaniem raportów PDF.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
