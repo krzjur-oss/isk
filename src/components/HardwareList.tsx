@@ -1,7 +1,98 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar } from "lucide-react";
+import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar } from "lucide-react";
 import { generateInventoryPDF } from "../utils/pdfGenerator";
+
+// Helper map to map CSV headers to InventoryItem keys (case-insensitive and Polish-compatible)
+const headerMapping: Record<string, keyof InventoryItem> = {
+  "id": "id",
+  "producent": "manufacturer",
+  "manufacturer": "manufacturer",
+  "model": "model",
+  "numer seryjny (s/n)": "serialNumber",
+  "numer seryjny": "serialNumber",
+  "serial number": "serialNumber",
+  "kategoria": "category",
+  "category": "category",
+  "sala": "room",
+  "room": "room",
+  "procesor": "processor",
+  "processor": "processor",
+  "ram": "ram",
+  "dysk": "storage",
+  "storage": "storage",
+  "grafika": "graphics",
+  "graphics": "graphics",
+  "system operacyjny": "operatingSystem",
+  "operating system": "operatingSystem",
+  "status": "status",
+  "data zakupu": "purchaseDate",
+  "purchase date": "purchaseDate",
+  "dodano": "addedAt",
+  "added at": "addedAt",
+  "modyfikowano": "lastModifiedAt",
+  "last modified": "lastModifiedAt",
+  "zastępuje (id)": "replacesItemId",
+  "replaces": "replacesItemId",
+  "zastąpiony przez (id)": "replacedByItemId",
+  "replaced by": "replacedByItemId",
+  "data wymiany": "replacementDate",
+  "replacement date": "replacementDate",
+  "notatki": "notes",
+  "notes": "notes"
+};
+
+// Robust custom CSV parser that handles quotes and semicolon or comma delimiters
+function parseCSV(text: string): string[][] {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  
+  // Normalize newlines
+  const content = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  
+  // Detect delimiter (semicolon is common in European Locales / Excel exports, fallback to comma)
+  const firstLine = content.split("\n")[0];
+  const delimiter = firstLine.includes(";") ? ";" : ",";
+  
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    const nextChar = content[i + 1];
+    
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === delimiter) {
+        row.push(current.trim());
+        current = "";
+      } else if (char === '\n') {
+        row.push(current.trim());
+        result.push(row);
+        row = [];
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+  if (current || row.length > 0) {
+    row.push(current.trim());
+    result.push(row);
+  }
+  return result;
+}
 
 // Helper function to calculate usage duration from purchase date to today
 const calculateUsageYears = (purchaseDateStr: string | undefined): { years: number; text: string; isOver3Years: boolean } | null => {
@@ -45,13 +136,15 @@ interface HardwareListProps {
   items: InventoryItem[];
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
+  onImportItems?: (items: InventoryItem[]) => void;
 }
 
-export default function HardwareList({ items, onEdit, onDelete }: HardwareListProps) {
+export default function HardwareList({ items, onEdit, onDelete, onImportItems }: HardwareListProps) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [onlyOver3Years, setOnlyOver3Years] = useState(false);
+  const [importedItems, setImportedItems] = useState<InventoryItem[] | null>(null);
 
   // Filter items based on criteria
   const filteredItems = items.filter(item => {
@@ -196,6 +289,130 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
     document.body.removeChild(link);
   };
 
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      try {
+        const rawRows = parseCSV(text);
+        if (rawRows.length < 2) {
+          alert("Plik CSV jest pusty lub niepoprawny.");
+          return;
+        }
+
+        const headers = rawRows[0];
+        
+        // Find property mappings from headers
+        const colIndices: Record<number, keyof InventoryItem> = {};
+        headers.forEach((h, index) => {
+          const cleanHeader = h.replace(/^\uFEFF/, "").toLowerCase().trim();
+          if (headerMapping[cleanHeader]) {
+            colIndices[index] = headerMapping[cleanHeader];
+          }
+        });
+
+        const parsedList: InventoryItem[] = [];
+
+        // Parse data rows
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          if (row.length === 0 || (row.length === 1 && !row[0])) continue;
+
+          const item: Partial<InventoryItem> = {};
+          
+          row.forEach((cell, index) => {
+            const prop = colIndices[index];
+            if (prop) {
+              const val = cell.trim();
+              if (val !== "") {
+                if (prop === "confidence") {
+                  item[prop] = Number(val) || 100;
+                } else {
+                  (item as any)[prop] = val;
+                }
+              }
+            }
+          });
+
+          if (!item.manufacturer || !item.model) {
+            continue; 
+          }
+
+          item.category = (item.category as HardwareCategory) || "Inny";
+          item.status = (item.status as HardwareStatus) || "W magazynie";
+
+          parsedList.push(item as InventoryItem);
+        }
+
+        if (parsedList.length === 0) {
+          alert("Nie znaleziono prawidłowych urządzeń w pliku CSV. Upewnij się, że plik posiada kolumny 'Producent' i 'Model'.");
+          return;
+        }
+
+        setImportedItems(parsedList);
+      } catch (err) {
+        console.error(err);
+        alert("Błąd podczas przetwarzania pliku CSV. Upewnij się, że plik ma poprawny format.");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const executeImport = (mode: "merge" | "add" | "replace") => {
+    if (!importedItems || !onImportItems) return;
+
+    let finalItems: InventoryItem[] = [];
+
+    if (mode === "replace") {
+      finalItems = importedItems.map((item, idx) => ({
+        ...item,
+        id: item.id || `device-${Date.now()}-${idx}`
+      }));
+    } else if (mode === "add") {
+      finalItems = [...items];
+      importedItems.forEach((item, idx) => {
+        const exists = item.id ? items.some(existing => existing.id === item.id) : false;
+        if (!exists) {
+          finalItems.push({
+            ...item,
+            id: item.id || `device-${Date.now()}-${idx}`
+          });
+        }
+      });
+    } else if (mode === "merge") {
+      const currentMap = new Map(items.map(item => [item.id, item]));
+      
+      importedItems.forEach((item, idx) => {
+        const id = item.id || `device-${Date.now()}-${idx}`;
+        if (currentMap.has(id)) {
+          currentMap.set(id, {
+            ...currentMap.get(id)!,
+            ...item,
+            id
+          });
+        } else {
+          currentMap.set(id, {
+            ...item,
+            id
+          });
+        }
+      });
+      
+      finalItems = Array.from(currentMap.values());
+    }
+
+    onImportItems(finalItems);
+    setImportedItems(null);
+    alert(`Pomyślnie zaimportowano urządzenia! Nowa liczba urządzeń w bazie: ${finalItems.length}`);
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
       {/* Search & Filters Bar */}
@@ -247,8 +464,24 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
           </div>
         </div>
 
-        {/* Action Buttons: Export CSV & PDF */}
+        {/* Action Buttons: Import/Export CSV & PDF */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => document.getElementById("csv-import-input")?.click()}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-sm"
+            title="Importuj i scal dane z pliku CSV"
+          >
+            <Upload className="h-4.5 w-4.5" />
+            Importuj CSV
+          </button>
+          <input
+            id="csv-import-input"
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="hidden"
+          />
+
           <button
             onClick={handleExportCSV}
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-sm"
@@ -479,6 +712,76 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
           </table>
         )}
       </div>
+
+      {/* Warning/Action modal for CSV imports */}
+      {importedItems && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-150 max-w-lg w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2.5 bg-blue-50 rounded-full text-blue-600 shrink-0">
+                <FileSpreadsheet className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Importowanie danych z pliku CSV</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Wczytano plik CSV zawierający <strong className="text-slate-800">{importedItems.length}</strong> {importedItems.length === 1 ? 'urządzenie' : (importedItems.length < 5 ? 'urządzenia' : 'urządzeń')}. Wybierz sposób scalenia z obecnym inwentarzem ({items.length} urządzeń):
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 my-5">
+              {/* Option 1: Merge and update */}
+              <button
+                type="button"
+                onClick={() => executeImport("merge")}
+                className="w-full text-left p-3 border border-slate-200 hover:border-blue-500 hover:bg-blue-50/20 rounded-lg transition-all cursor-pointer group flex gap-3 items-start"
+              >
+                <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 group-hover:bg-blue-200">1</div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Aktualizuj istniejące i dodaj nowe (Zalecane)</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">Aktualizuje istniejące urządzenia (znajduje po ID) oraz dodaje nowe wpisy. Pozwala to na scalenie inwentaryzacji przeprowadzonej na wielu telefonach.</p>
+                </div>
+              </button>
+
+              {/* Option 2: Add only */}
+              <button
+                type="button"
+                onClick={() => executeImport("add")}
+                className="w-full text-left p-3 border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/20 rounded-lg transition-all cursor-pointer group flex gap-3 items-start"
+              >
+                <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 group-hover:bg-emerald-200">2</div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Tylko dodaj nowe</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">Ignoruje wszelkie urządzenia o identyfikatorach ID już istniejących w bazie i importuje tylko nowe urządzenia.</p>
+                </div>
+              </button>
+
+              {/* Option 3: Replace all */}
+              <button
+                type="button"
+                onClick={() => executeImport("replace")}
+                className="w-full text-left p-3 border border-slate-200 hover:border-rose-500 hover:bg-rose-50/20 rounded-lg transition-all cursor-pointer group flex gap-3 items-start"
+              >
+                <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 group-hover:bg-rose-200">3</div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Zastąp całą ewidencję</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 text-rose-600 font-medium leading-relaxed">⚠️ Uwaga: Zastępuje cały obecny inwentarz zawartością z pliku CSV (wszystkie aktualne dane zostaną usunięte).</p>
+                </div>
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setImportedItems(null)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

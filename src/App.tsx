@@ -343,6 +343,7 @@ export default function App() {
                   items={items}
                   onEdit={handleEditItem}
                   onDelete={handleDeleteItem}
+                  onImportItems={saveItemsToDatabase}
                 />
               </div>
 
