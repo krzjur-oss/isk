@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -313,6 +314,46 @@ Zwróć dane w formacie JSON pasującym do tego schematu. Nie dodawaj żadnych z
     } catch (error: any) {
       console.error("Błąd odświeżania tokenu Microsoft:", error);
       res.status(500).json({ error: error.message || "Failed to refresh token" });
+    }
+  });
+
+  // Dynamic build / file modification info endpoint
+  app.get("/api/build-info", (req, res) => {
+    try {
+      const filesToCheck = [
+        path.join(process.cwd(), "src/App.tsx"),
+        path.join(process.cwd(), "src/components/AboutApp.tsx"),
+        path.join(process.cwd(), "src/components/HardwareList.tsx"),
+        path.join(process.cwd(), "src/components/AdvancedFeatures.tsx"),
+        path.join(process.cwd(), "server.ts"),
+        path.join(process.cwd(), "package.json")
+      ];
+
+      let maxMtime = 0;
+      filesToCheck.forEach(file => {
+        try {
+          if (fs.existsSync(file)) {
+            const stats = fs.statSync(file);
+            if (stats.mtimeMs > maxMtime) {
+              maxMtime = stats.mtimeMs;
+            }
+          }
+        } catch (e) {
+          // Ignore
+        }
+      });
+
+      const finalTime = maxMtime > 0 ? new Date(maxMtime) : new Date();
+
+      res.json({
+        lastModified: finalTime.toISOString(),
+        version: "1.2.0"
+      });
+    } catch (error: any) {
+      res.json({
+        lastModified: new Date().toISOString(),
+        version: "1.2.0"
+      });
     }
   });
 

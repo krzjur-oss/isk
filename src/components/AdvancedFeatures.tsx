@@ -1,11 +1,104 @@
 import React, { useState, useEffect } from "react";
 import { InventoryItem, HardwareStatus, HardwareCategory } from "../types";
+import { useToast } from "./Toast";
 import { 
   QrCode, BarChart3, MapPin, Trash2, Printer, Download, Check, 
   AlertTriangle, ShieldCheck, User, Calendar, FileText, FileSignature, 
   ChevronRight, RefreshCw, Layers, Sparkles, Cloud, Upload, HardDrive, 
-  FileDown, Database, HelpCircle, LogOut, Key, Info
+  FileDown, Database, HelpCircle, LogOut, Key, Info, FileSpreadsheet
 } from "lucide-react";
+import { generateInventoryPDF } from "../utils/pdfGenerator";
+
+// Helper map to map CSV headers to InventoryItem keys (case-insensitive and Polish-compatible)
+const headerMapping: Record<string, keyof InventoryItem> = {
+  "id": "id",
+  "producent": "manufacturer",
+  "manufacturer": "manufacturer",
+  "model": "model",
+  "numer seryjny (s/n)": "serialNumber",
+  "numer seryjny": "serialNumber",
+  "serial number": "serialNumber",
+  "kategoria": "category",
+  "category": "category",
+  "sala": "room",
+  "room": "room",
+  "procesor": "processor",
+  "processor": "processor",
+  "ram": "ram",
+  "dysk": "storage",
+  "storage": "storage",
+  "grafika": "graphics",
+  "graphics": "graphics",
+  "system operacyjny": "operatingSystem",
+  "operating system": "operatingSystem",
+  "status": "status",
+  "data zakupu": "purchaseDate",
+  "purchase date": "purchaseDate",
+  "dodano": "addedAt",
+  "added at": "addedAt",
+  "modyfikowano": "lastModifiedAt",
+  "last modified": "lastModifiedAt",
+  "zastępuje (id)": "replacesItemId",
+  "replaces": "replacesItemId",
+  "zastąpiony przez (id)": "replacedByItemId",
+  "replaced by": "replacedByItemId",
+  "data wymiany": "replacementDate",
+  "replacement date": "replacementDate",
+  "notatki": "notes",
+  "notes": "notes"
+};
+
+// Robust custom CSV parser that handles quotes and semicolon or comma delimiters
+function parseCSV(text: string): string[][] {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  
+  // Normalize newlines
+  const content = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  
+  // Detect delimiter (semicolon is common in European Locales / Excel exports, fallback to comma)
+  const firstLine = content.split("\n")[0];
+  const delimiter = firstLine.includes(";") ? ";" : ",";
+  
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    const nextChar = content[i + 1];
+    
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === delimiter) {
+        row.push(current.trim());
+        current = "";
+      } else if (char === '\n') {
+        row.push(current.trim());
+        result.push(row);
+        row = [];
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+  if (current || row.length > 0) {
+    row.push(current.trim());
+    result.push(row);
+  }
+  return result;
+}
 
 interface AdvancedFeaturesProps {
   items: InventoryItem[];
@@ -69,7 +162,8 @@ function generateQRMatrix(text: string): boolean[][] {
 }
 
 export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeaturesProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"qr" | "charts" | "rooms" | "disposal" | "onedrive">("qr");
+  const { toastSuccess, toastError, toastInfo, toastWarning } = useToast();
+  const [activeSubTab, setActiveSubTab] = useState<"qr" | "charts" | "rooms" | "disposal" | "onedrive" | "data">("qr");
 
   // 1. QR Code State
   const [selectedQRItem, setSelectedQRItem] = useState<InventoryItem | null>(
@@ -137,6 +231,236 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   const [disposalReason, setDisposalReason] = useState("Zestarzenie technologiczne, zużycie fizyczne podzespołów, brak możliwości instalacji nowoczesnych systemów operacyjnych.");
   const [isProtocolGenerated, setIsProtocolGenerated] = useState(false);
 
+  // 6. CSV/PDF/JSON Import & Export State
+  const [importedCSVItems, setImportedCSVItems] = useState<InventoryItem[] | null>(null);
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      try {
+        const rawRows = parseCSV(text);
+        if (rawRows.length < 2) {
+          alert("Plik CSV jest pusty lub niepoprawny.");
+          return;
+        }
+
+        const headers = rawRows[0];
+        const colIndices: Record<number, keyof InventoryItem> = {};
+        headers.forEach((h, index) => {
+          const cleanHeader = h.replace(/^\uFEFF/, "").toLowerCase().trim();
+          if (headerMapping[cleanHeader]) {
+            colIndices[index] = headerMapping[cleanHeader];
+          }
+        });
+
+        const parsedList: InventoryItem[] = [];
+
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          if (row.length === 0 || (row.length === 1 && !row[0])) continue;
+
+          const item: Partial<InventoryItem> = {};
+          
+          row.forEach((cell, index) => {
+            const prop = colIndices[index];
+            if (prop) {
+              const val = cell.trim();
+              if (val !== "") {
+                if (prop === "confidence") {
+                  item[prop] = Number(val) || 100;
+                } else {
+                  (item as any)[prop] = val;
+                }
+              }
+            }
+          });
+
+          if (!item.manufacturer || !item.model) {
+             continue; 
+          }
+
+          item.category = (item.category as HardwareCategory) || "Inny";
+          item.status = (item.status as HardwareStatus) || "W magazynie";
+
+          parsedList.push(item as InventoryItem);
+        }
+
+        if (parsedList.length === 0) {
+          toastError("Nie znaleziono prawidłowych urządzeń w pliku CSV. Upewnij się, że plik posiada kolumny 'Producent' i 'Model'.");
+          return;
+        }
+
+        setImportedCSVItems(parsedList);
+      } catch (err) {
+        console.error(err);
+        toastError("Błąd podczas przetwarzania pliku CSV. Upewnij się, że plik ma poprawny format.");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const executeCSVImport = (mode: "merge" | "add" | "replace") => {
+    if (!importedCSVItems) return;
+
+    let finalItems: InventoryItem[] = [];
+
+    if (mode === "replace") {
+      finalItems = importedCSVItems.map((item, idx) => ({
+        ...item,
+        id: item.id || `device-${Date.now()}-${idx}`
+      }));
+    } else if (mode === "add") {
+      finalItems = [...items];
+      importedCSVItems.forEach((item, idx) => {
+        const exists = item.id ? items.some(existing => existing.id === item.id) : false;
+        if (!exists) {
+          finalItems.push({
+            ...item,
+            id: item.id || `device-${Date.now()}-${idx}`
+          });
+        }
+      });
+    } else if (mode === "merge") {
+      const currentMap = new Map(items.map(item => [item.id, item]));
+      
+      importedCSVItems.forEach((item, idx) => {
+        const id = item.id || `device-${Date.now()}-${idx}`;
+        if (currentMap.has(id)) {
+          currentMap.set(id, {
+            ...currentMap.get(id)!,
+            ...item,
+            id
+          });
+        } else {
+          currentMap.set(id, {
+            ...item,
+            id
+          });
+        }
+      });
+      
+      finalItems = Array.from(currentMap.values());
+    }
+
+    onUpdateItems(finalItems);
+    setImportedCSVItems(null);
+    toastSuccess(`Pomyślnie zaimportowano urządzenia! Nowa liczba urządzeń w bazie: ${finalItems.length}`);
+  };
+
+  const handleExportPDF = () => {
+    if (items.length === 0) {
+      toastWarning("Brak urządzeń do wygenerowania raportu.");
+      return;
+    }
+    generateInventoryPDF(items);
+    toastSuccess("Pomyślnie wygenerowano raport PDF!");
+  };
+
+  const handleExportCSV = () => {
+    if (items.length === 0) {
+      toastWarning("Brak urządzeń do wygenerowania pliku CSV.");
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Producent",
+      "Model",
+      "Numer seryjny (S/N)",
+      "Kategoria",
+      "Sala",
+      "Procesor",
+      "RAM",
+      "Dysk",
+      "Grafika",
+      "System operacyjny",
+      "Status",
+      "Data zakupu",
+      "Dodano",
+      "Modyfikowano",
+      "Zastępuje (ID)",
+      "Zastąpiony przez (ID)",
+      "Data wymiany",
+      "Notatki"
+    ];
+
+    const escapeCSV = (val: string | number | undefined | null) => {
+      if (val === undefined || val === null) return "";
+      const str = String(val);
+      const escaped = str.replace(/"/g, '""');
+      if (escaped.includes(";") || escaped.includes("\n") || escaped.includes("\r") || escaped.includes('"')) {
+        return `"${escaped}"`;
+      }
+      return escaped;
+    };
+
+    const rows = items.map(item => [
+      item.id,
+      item.manufacturer,
+      item.model,
+      item.serialNumber || "",
+      item.category,
+      item.room || "",
+      item.processor || "",
+      item.ram || "",
+      item.storage || "",
+      item.graphics || "",
+      item.operatingSystem || "",
+      item.status,
+      item.purchaseDate || "",
+      item.addedAt || "",
+      item.lastModifiedAt || "",
+      item.replacesItemId || "",
+      item.replacedByItemId || "",
+      item.replacementDate || "",
+      item.notes || ""
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(escapeCSV).join(";"))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    const todayStr = new Date().toISOString().split("T")[0];
+    link.setAttribute("download", `inwentarz_sprzetu_${todayStr}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toastSuccess("Pomyślnie wyeksportowano listę do pliku CSV!");
+  };
+
+  const handleExportJSON = () => {
+    try {
+      const backupData = JSON.stringify(items, null, 2);
+      const blob = new Blob([backupData], { type: "application/json;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      
+      const todayStr = new Date().toISOString().split("T")[0];
+      link.setAttribute("download", `kopia_zapasowa_inwentarza_${todayStr}.json`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toastSuccess("Pobrana została pełna kopia zapasowa JSON!");
+    } catch (err) {
+      console.error(err);
+      toastError("Błąd podczas generowania pliku JSON kopii zapasowej.");
+    }
+  };
+
   // Helper: List of unique rooms
   const roomsList = Array.from(
     new Set(items.map(item => item.room || "Nieprzypisana").filter(Boolean))
@@ -158,6 +482,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
     });
 
     onUpdateItems(updated);
+    toastSuccess(`Pomyślnie przeniesiono ${selectedBulkItems.length} ${selectedBulkItems.length === 1 ? "urządzenie" : "urządzeń"} do sali: ${bulkMoveTarget}`);
     setSelectedBulkItems([]);
     setBulkMoveTarget("");
     setIsSuccessNotification(`Pomyślnie przeniesiono urządzenia do sali: ${bulkMoveTarget}`);
@@ -634,6 +959,17 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
             >
               <MapPin className="h-3.5 w-3.5" />
               4. Audytor lokalizacji
+            </button>
+            <button
+              onClick={() => { setActiveSubTab("data"); setIsProtocolGenerated(false); }}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                activeSubTab === "data"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              5. Import / Eksport CSV i PDF
             </button>
             <button
               onClick={() => { setActiveSubTab("disposal"); }}
@@ -1846,6 +2182,156 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
                   <p className="text-[10px] text-slate-400 mt-0.5">Przeciągnij plik inventory.json tutaj lub kliknij, aby wybrać</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB: DATA MANAGEMENT (IMPORT/EXPORT CSV & PDF & JSON) */}
+      {activeSubTab === "data" && (
+        <div className="space-y-6 animate-in fade-in duration-250">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* COLUMN 1: EXPORTS */}
+            <div className="bg-white rounded-xl border border-slate-150 p-6 space-y-6 shadow-xs text-left">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <FileDown className="h-4.5 w-4.5 text-indigo-600" />
+                  Eksport i Kopia Zapasowa Danych
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">Wygeneruj i pobierz dane z bazy w wybranym formacie.</p>
+              </div>
+
+              <div className="space-y-4">
+                {/* PDF */}
+                <div className="p-4 border border-slate-100 rounded-lg hover:border-slate-200 transition-colors space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-700">Pełny raport inwentarza (PDF)</h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Generuje profesjonalny dokument gotowy do wydruku lub archiwizacji zawierający aktualny spis.</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 rounded-md text-slate-500">PDF</span>
+                  </div>
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Pobierz raport PDF ({items.length} urządzeń)
+                  </button>
+                </div>
+
+                {/* CSV */}
+                <div className="p-4 border border-slate-100 rounded-lg hover:border-slate-200 transition-colors space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-700">Eksport tabelaryczny (CSV)</h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Eksportuje urządzenia do arkusza kalkulacyjnego Excel/LibreOffice z obsługą polskich znaków (UTF-8).</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700">CSV</span>
+                  </div>
+                  <button
+                    onClick={handleExportCSV}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Pobierz arkusz CSV (.csv)
+                  </button>
+                </div>
+
+                {/* JSON BACKUP */}
+                <div className="p-4 border border-slate-100 rounded-lg hover:border-slate-200 transition-colors space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-700">Kopia bezpieczeństwa (JSON)</h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Pobiera pełny plik bazy danych ze wszystkimi powiązaniami, który można później wgrać na dowolnym komputerze.</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700">JSON</span>
+                  </div>
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Database className="h-4 w-4" />
+                    Utwórz kopię zapasową JSON
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* COLUMN 2: IMPORTS */}
+            <div className="bg-white rounded-xl border border-slate-150 p-6 space-y-6 shadow-xs text-left flex flex-col justify-between">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <Upload className="h-4.5 w-4.5 text-indigo-600" />
+                    Import danych z pliku CSV
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">Dodaj lub zaktualizuj bazę danych inwentaryzacji za pomocą przygotowanego pliku CSV.</p>
+                </div>
+
+                <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-100 space-y-2">
+                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Format pliku:</h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Aplikacja wspiera polskie i angielskie nagłówki (np. <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">Producent</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">Model</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">Numer seryjny</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">Sala</code>, <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">Status</code>). Separatorem może być średnik <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">;</code> lub przecinek <code className="bg-slate-200/60 px-1 py-0.5 rounded font-mono font-bold">,</code>.
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <input
+                    id="csv-advanced-import"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImportCSV}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => document.getElementById("csv-advanced-import")?.click()}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Upload className="h-4.5 w-4.5" />
+                    Wybierz plik .CSV do zaimportowania
+                  </button>
+                </div>
+              </div>
+
+              {importedCSVItems && (
+                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3 animate-in slide-in-from-bottom-2 duration-200">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-900">Załadowano plik CSV</h4>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        Wczytano plik zawierający <strong className="text-amber-950 font-extrabold">{importedCSVItems.length}</strong> {importedCSVItems.length === 1 ? 'urządzenie' : (importedCSVItems.length < 5 ? 'urządzenia' : 'urządzeń')}.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 pt-1.5">
+                    <button
+                      onClick={() => executeCSVImport("merge")}
+                      className="w-full text-left p-2.5 bg-white border border-slate-200 hover:border-blue-500 rounded-lg text-xs font-bold text-slate-700 hover:bg-blue-50/10 cursor-pointer transition-all flex justify-between items-center"
+                    >
+                      <span>Aktualizuj istniejące i dodaj nowe (Scal)</span>
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                    </button>
+                    <button
+                      onClick={() => executeCSVImport("add")}
+                      className="w-full text-left p-2.5 bg-white border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-bold text-slate-700 hover:bg-emerald-50/10 cursor-pointer transition-all flex justify-between items-center"
+                    >
+                      <span>Tylko dodaj nowe</span>
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                    </button>
+                    <button
+                      onClick={() => executeCSVImport("replace")}
+                      className="w-full text-left p-2.5 bg-white border border-rose-200 hover:border-rose-500 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50/10 cursor-pointer transition-all flex justify-between items-center"
+                    >
+                      <span>Zastąp całą bazę (⚠️ Usuwa stare dane)</span>
+                      <ChevronRight className="h-4 w-4 text-rose-400" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

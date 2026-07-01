@@ -7,6 +7,7 @@ import ReplacementManager from "./components/ReplacementManager";
 import AboutApp from "./components/AboutApp";
 import AdvancedFeatures from "./components/AdvancedFeatures";
 import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle } from "lucide-react";
+import { ToastProvider, useToast } from "./components/Toast";
 
 const LOCAL_STORAGE_KEY = "it_inventory_items_v1";
 
@@ -108,6 +109,15 @@ const INITIAL_ITEMS: InventoryItem[] = [
 ];
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
+
+function AppContent() {
+  const { toastSuccess, toastError, toastInfo, toastWarning } = useToast();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"inventory" | "replacements" | "about" | "improvements">("inventory");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -329,16 +339,19 @@ export default function App() {
                 setOneDriveLastSync(nowStr);
                 setOneDriveSyncError(false);
                 console.log("Automatic OneDrive synchronization succeeded at " + nowStr);
+                toastSuccess("Zsynchronizowano bazę danych z OneDrive!");
               } else {
                 localStorage.setItem("onedrive_sync_error", "true");
                 setOneDriveSyncError(true);
                 console.warn("Automatic OneDrive sync returned status " + res.status);
+                toastWarning("Automatyczny zapis kopii na OneDrive nie powiódł się.");
               }
             })
             .catch(err => {
               localStorage.setItem("onedrive_sync_error", "true");
               setOneDriveSyncError(true);
               console.error("Automatic OneDrive sync failed:", err);
+              toastError("Błąd automatycznej synchronizacji z OneDrive.");
             });
           }
         } catch (e) {
@@ -376,6 +389,7 @@ export default function App() {
 
       saveItemsToDatabase(updated);
       setEditingItem(null);
+      toastSuccess(`Zapisano zmiany dla urządzenia ${itemData.manufacturer} ${itemData.model}!`);
     } else {
       // Creating new item
       const newId = `device-${Date.now()}`;
@@ -399,11 +413,15 @@ export default function App() {
       }
 
       saveItemsToDatabase(updated);
+      toastSuccess(`Pomyślnie dodano urządzenie ${itemData.manufacturer} ${itemData.model}!`);
     }
   };
 
   const handleDeleteItem = (id: string) => {
-    if (!confirm("Czy na pewno chcesz usunąć to urządzenie z inwentarza?")) {
+    const targetItem = items.find(item => item.id === id);
+    const label = targetItem ? `${targetItem.manufacturer} ${targetItem.model}` : "Urządzenie";
+
+    if (!confirm(`Czy na pewno chcesz usunąć urządzenie "${label}" z inwentarza?`)) {
       return;
     }
 
@@ -429,6 +447,8 @@ export default function App() {
     if (editingItem?.id === id) {
       setEditingItem(null);
     }
+    
+    toastInfo(`Usunięto urządzenie ${label} z inwentarza.`);
   };
 
   const handleEditItem = (item: InventoryItem) => {
@@ -653,7 +673,6 @@ export default function App() {
                   items={items}
                   onEdit={handleEditItem}
                   onDelete={handleDeleteItem}
-                  onImportItems={saveItemsToDatabase}
                 />
               </div>
 

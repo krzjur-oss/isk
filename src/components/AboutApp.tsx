@@ -1,8 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle } from "lucide-react";
 
 export default function AboutApp() {
   const [activeSection, setActiveSection] = useState<"info" | "author" | "terms" | "license">("info");
+  const [buildInfo, setBuildInfo] = useState<{ version: string; lastModified: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/build-info")
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
+      .then((data) => {
+        setBuildInfo(data);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Błąd podczas pobierania informacji o wersji:", err);
+        setIsLoading(false);
+      });
+  }, []);
+
+  const formatBuildDate = (isoString?: string) => {
+    if (!isoString) return "brak danych";
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleString("pl-PL", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    } catch {
+      return isoString;
+    }
+  };
 
   const sections = [
     { id: "info", label: "O Programie", icon: Info },
@@ -46,10 +81,16 @@ export default function AboutApp() {
             <div className="flex flex-col lg:flex-row gap-6 items-start">
               <div className="flex-1 space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900 mb-1 flex flex-wrap items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    Inteligentny System Inwentaryzacji — SCANVENTORY (v1.2.0)
+                    Inteligentny System Inwentaryzacji — SCANVENTORY (v{buildInfo?.version || "1.2.0"})
                   </h3>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-150 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                      Ostatnia kompilacja / edycja: {isLoading ? "pobieranie..." : formatBuildDate(buildInfo?.lastModified)}
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Aplikacja <strong>SCANVENTORY</strong> została stworzona z myślą o maksymalnym uproszczeniu i przyspieszeniu procesu inwentaryzacji sprzętu IT oraz innych zasobów firmowych. Wykorzystuje zaawansowane technologie webowe i algorytmy sztucznej inteligencji, pozwalając na sprawną ewidencję bezpośrednio z urządzeń mobilnych oraz łatwe zarządzanie na stacjach roboczych.
                   </p>
@@ -105,6 +146,16 @@ export default function AboutApp() {
                   Specyfikacja Techniczna
                 </h4>
                 <div className="space-y-2 text-[10px]">
+                  <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                    <span className="text-slate-500 font-medium">Wersja systemu</span>
+                    <span className="text-blue-600 font-bold">{buildInfo?.version || "1.2.0"}</span>
+                  </div>
+                  <div className="flex flex-col border-b border-slate-200 pb-1.5 gap-0.5">
+                    <span className="text-slate-500 font-medium">Ostatnia edycja plików</span>
+                    <span className="text-slate-800 font-bold text-[9px] truncate" title={formatBuildDate(buildInfo?.lastModified)}>
+                      {isLoading ? "pobieranie..." : formatBuildDate(buildInfo?.lastModified)}
+                    </span>
+                  </div>
                   <div className="flex justify-between border-b border-slate-200 pb-1.5">
                     <span className="text-slate-500 font-medium">Technologia</span>
                     <span className="text-slate-800 font-bold">React 18 + TS + Vite</span>
