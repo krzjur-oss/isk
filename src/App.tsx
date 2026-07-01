@@ -8,6 +8,7 @@ import AboutApp from "./components/AboutApp";
 import AdvancedFeatures from "./components/AdvancedFeatures";
 import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle } from "lucide-react";
 import { ToastProvider, useToast } from "./components/Toast";
+import { msalInstance, getToken } from "./msalConfig";
 
 const LOCAL_STORAGE_KEY = "it_inventory_items_v1";
 
@@ -237,51 +238,35 @@ function AppContent() {
 
   const handleConnectOneDrive = async () => {
     try {
-      const useCustom = localStorage.getItem("onedrive_use_custom") === "true";
-      let url = "";
+      const loginRequest = {
+        scopes: ["Files.ReadWrite", "Files.ReadWrite.All", "User.Read"]
+      };
+
+      const response = await msalInstance.loginPopup(loginRequest);
+      console.log("Zalogowano jako:", response.account.username);
+
+      const user = {
+        displayName: response.account.name || response.account.username || "Użytkownik Microsoft 365",
+        principalName: response.account.username || "szkola@onedrive.com"
+      };
+
+      const tokens = {
+        access_token: response.accessToken,
+        expires_at: response.expiresOn ? response.expiresOn.getTime() : (Date.now() + 3600000),
+        is_custom: true
+      };
+
+      localStorage.setItem("onedrive_tokens", JSON.stringify(tokens));
+      localStorage.setItem("onedrive_user", JSON.stringify(user));
+      localStorage.setItem("onedrive_sync_error", "false");
       
-      if (useCustom) {
-        const customClientId = localStorage.getItem("onedrive_custom_client_id") || "";
-        const customTenantId = localStorage.getItem("onedrive_custom_tenant_id") || "common";
-        if (!customClientId.trim()) {
-          alert("Wpisz najpierw swój szkolny Client ID w zakładce 'Usprawnienia i raporty' -> 'Chmura OneDrive'!");
-          return;
-        }
-        const params = new URLSearchParams({
-          client_id: customClientId.trim(),
-          response_type: "token",
-          redirect_uri: window.location.origin + window.location.pathname,
-          scope: "files.readwrite User.Read",
-          state: "onedrive-custom-sync"
-        });
-        url = `https://login.microsoftonline.com/${customTenantId}/oauth2/v2.0/authorize?${params.toString()}`;
-      } else {
-        const origin = window.location.origin;
-        const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
-        }
-        const { url: apiConfiguredUrl } = await response.json();
-        url = apiConfiguredUrl;
-      }
+      setOnedriveUser(user);
+      setOneDriveSyncError(false);
       
-      const width = 600;
-      const height = 650;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      
-      const popup = window.open(
-        url,
-        "microsoft_oauth_popup",
-        `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes`
-      );
-      
-      if (!popup) {
-        alert("Wyskakujące okno zostało zablokowane przez przeglądarkę! Zezwól na wyskakujące okna dla tej witryny.");
-      }
+      toastSuccess(`Zalogowano pomyślnie jako ${user.displayName}!`);
     } catch (err: any) {
-      alert(`Błąd inicjalizacji: ${err.message || err}`);
+      console.error(err);
+      toastError(`Błąd logowania: ${err.message || err}`);
     }
   };
 
@@ -318,46 +303,69 @@ function AppContent() {
 
     // Optional background auto-sync to Microsoft OneDrive
     if (localStorage.getItem("onedrive_auto_sync") === "true") {
-      const storedTokens = localStorage.getItem("onedrive_tokens");
-      if (storedTokens) {
+      const performAutoSync = async () => {
         try {
-          const { access_token } = JSON.parse(storedTokens);
-          if (access_token) {
-            fetch("https://graph.microsoft.com/v1.0/me/drive/root:/Scanventory/inventory.json:/content", {
+          const token = await getToken();
+          if (token) {
+            const res = await fetch("https://graph.microsoft.com/v1.0/me/drive/root:/Scanventory/inventory.json:/content", {
               method: "PUT",
               headers: {
-                "Authorization": `Bearer ${access_token}`,
+                "Authorization": `Bearer ${token}`,
                 "Content-Type": "application/json"
               },
               body: JSON.stringify(newItems)
-            })
-            .then(res => {
-              if (res.ok) {
-                const nowStr = new Date().toLocaleString("pl-PL");
-                localStorage.setItem("onedrive_last_sync", nowStr);
-                localStorage.setItem("onedrive_sync_error", "false");
-                setOneDriveLastSync(nowStr);
-                setOneDriveSyncError(false);
-                console.log("Automatic OneDrive synchronization succeeded at " + nowStr);
-                toastSuccess("Zsynchronizowano bazę danych z OneDrive!");
-              } else {
-                localStorage.setItem("onedrive_sync_error", "true");
-                setOneDriveSyncError(true);
-                console.warn("Automatic OneDrive sync returned status " + res.status);
-                toastWarning("Automatyczny zapis kopii na OneDrive nie powiódł się.");
-              }
-            })
-            .catch(err => {
-              localStorage.setItem("onedrive_sync_error", "true");
-              setOneDriveSyncError(true);
-              console.error("Automatic OneDrive sync failed:", err);
-              toastError("Błąd automatycznej synchronizacji z OneDrive.");
             });
+            if (res.ok) {
+              const nowStr = new Date().toLocaleString("pl-PL");
+              localStorage.setItem("onedrive_last_sync", nowStr);
+              localStorage.setItem("onedrive_sync_error", "false");
+              setOneDriveLastSync(nowStr);
+              setOneDriveSyncError(false);
+              console.log("Automatic OneDrive synchronization succeeded at " + nowStr);
+              toastSuccess("Zsynchronizowano bazę danych z OneDrive!");
+              return;
+            } else {
+              throw new Error(`HTTP status ${res.status}`);
+            }
           }
-        } catch (e) {
-          console.error("Error parsing OneDrive tokens for auto-sync:", e);
+        } catch (err) {
+          console.warn("Silent token acquisition failed, trying fallback:", err);
+          const storedTokens = localStorage.getItem("onedrive_tokens");
+          if (storedTokens) {
+            try {
+              const { access_token } = JSON.parse(storedTokens);
+              if (access_token) {
+                const res = await fetch("https://graph.microsoft.com/v1.0/me/drive/root:/Scanventory/inventory.json:/content", {
+                  method: "PUT",
+                  headers: {
+                    "Authorization": `Bearer ${access_token}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify(newItems)
+                });
+                if (res.ok) {
+                  const nowStr = new Date().toLocaleString("pl-PL");
+                  localStorage.setItem("onedrive_last_sync", nowStr);
+                  localStorage.setItem("onedrive_sync_error", "false");
+                  setOneDriveLastSync(nowStr);
+                  setOneDriveSyncError(false);
+                  console.log("Automatic OneDrive synchronization succeeded at " + nowStr);
+                  toastSuccess("Zsynchronizowano bazę danych z OneDrive!");
+                  return;
+                }
+              }
+            } catch (e) {
+              console.error("Fallback auto-sync token parse failed", e);
+            }
+          }
+          localStorage.setItem("onedrive_sync_error", "true");
+          setOneDriveSyncError(true);
+          console.error("Automatic OneDrive sync failed:", err);
+          toastError("Błąd automatycznej synchronizacji z OneDrive.");
         }
-      }
+      };
+
+      performAutoSync();
     }
   };
 

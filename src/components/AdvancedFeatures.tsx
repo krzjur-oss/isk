@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { InventoryItem, HardwareStatus, HardwareCategory } from "../types";
 import { useToast } from "./Toast";
+import { msalInstance, getToken } from "../msalConfig";
 import { 
   QrCode, BarChart3, MapPin, Trash2, Printer, Download, Check, 
   AlertTriangle, ShieldCheck, User, Calendar, FileText, FileSignature, 
@@ -615,7 +616,17 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   };
 
   const uploadToOneDrive = async (token = onedriveTokens?.access_token) => {
-    if (!token) return;
+    let activeToken = token;
+    try {
+      const freshToken = await getToken();
+      if (freshToken) {
+        activeToken = freshToken;
+      }
+    } catch (e) {
+      console.warn("Silent token acquisition failed, using fallback:", e);
+    }
+
+    if (!activeToken) return;
     setIsOneDriveSyncing(true);
     setOneDriveSyncMessage({ type: "info", text: "Wysyłanie bazy danych do OneDrive..." });
     
@@ -623,7 +634,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
       const response = await fetch("https://graph.microsoft.com/v1.0/me/drive/root:/Scanventory/inventory.json:/content", {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${activeToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(items)
@@ -639,7 +650,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
           text: `Pomyślnie zsynchronizowano z OneDrive! Zapisano ${items.length} urządzeń o ${nowStr}.`
         });
       } else {
-        if (response.status === 401 && onedriveTokens?.refresh_token) {
+        if (response.status === 401) {
           const newToken = await refreshMicrosoftToken();
           if (newToken) {
             await uploadToOneDrive(newToken);
@@ -663,13 +674,23 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   };
 
   const downloadFromOneDrive = async (token = onedriveTokens?.access_token) => {
-    if (!token) return;
+    let activeToken = token;
+    try {
+      const freshToken = await getToken();
+      if (freshToken) {
+        activeToken = freshToken;
+      }
+    } catch (e) {
+      console.warn("Silent token acquisition failed, using fallback:", e);
+    }
+
+    if (!activeToken) return;
     setIsOneDriveSyncing(true);
     setOneDriveSyncMessage({ type: "info", text: "Pobieranie bazy danych z OneDrive..." });
     
     try {
       const response = await fetch("https://graph.microsoft.com/v1.0/me/drive/root:/Scanventory/inventory.json:/content", {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       
       if (response.ok) {
@@ -688,7 +709,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
           throw new Error("Dane na OneDrive mają niepoprawny format (oczekiwano tablicy JSON).");
         }
       } else {
-        if (response.status === 401 && onedriveTokens?.refresh_token) {
+        if (response.status === 401) {
           const newToken = await refreshMicrosoftToken();
           if (newToken) {
             await downloadFromOneDrive(newToken);
@@ -713,26 +734,17 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
 
   const refreshMicrosoftToken = async (): Promise<string | null> => {
     try {
-      const response = await fetch("/api/auth/microsoft/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: onedriveTokens?.refresh_token })
-      });
-      
-      if (response.ok) {
-        const tokens = await response.json();
+      const token = await getToken();
+      if (token) {
         const updatedTokens = {
           ...onedriveTokens,
-          access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token || onedriveTokens.refresh_token
+          access_token: token
         };
         setOnedriveTokens(updatedTokens);
         localStorage.setItem("onedrive_tokens", JSON.stringify(updatedTokens));
-        return tokens.access_token;
-      } else {
-        handleOneDriveLogout();
-        throw new Error("Sesja OneDrive wygasła. Zaloguj się ponownie.");
+        return token;
       }
+      return null;
     } catch (err: any) {
       console.error("Token refresh error:", err);
       return null;
@@ -758,53 +770,44 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   const handleConnectOneDrive = async () => {
     setOneDriveSyncMessage({ type: "info", text: "Trwa uruchamianie połączenia z Microsoft 365..." });
     try {
-      let url = "";
-      if (useCustomOneDrive) {
-        if (!customClientId.trim()) {
-          throw new Error("Wpisz Identyfikator aplikacji (Client ID) swojej szkoły!");
-        }
-        const tenant = customTenantId.trim() || "common";
-        const params = new URLSearchParams({
-          client_id: customClientId.trim(),
-          response_type: "token",
-          redirect_uri: window.location.origin + window.location.pathname,
-          scope: "files.readwrite User.Read",
-          state: "onedrive-custom-sync"
-        });
-        url = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?${params.toString()}`;
-      } else {
-        const origin = window.location.origin;
-        const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
-        }
-        const { url: apiConfiguredUrl } = await response.json();
-        url = apiConfiguredUrl;
-      }
-      
-      const width = 600;
-      const height = 650;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      
-      const popup = window.open(
-        url,
-        "microsoft_oauth_popup",
-        `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes`
-      );
-      
-      if (!popup) {
-        setOneDriveSyncMessage({
-          type: "error",
-          text: "Wyskakujące okno zostało zablokowane przez przeglądarkę! Zezwól na wyskakujące okna dla tej witryny."
-        });
-      }
+      const loginRequest = {
+        scopes: ["Files.ReadWrite", "Files.ReadWrite.All", "User.Read"]
+      };
+
+      const response = await msalInstance.loginPopup(loginRequest);
+      console.log("Zalogowano jako:", response.account.username);
+
+      const user = {
+        displayName: response.account.name || response.account.username || "Użytkownik Microsoft 365",
+        principalName: response.account.username || "szkola@onedrive.com"
+      };
+
+      const tokens = {
+        access_token: response.accessToken,
+        expires_at: response.expiresOn ? response.expiresOn.getTime() : (Date.now() + 3600000),
+        is_custom: true
+      };
+
+      setOnedriveTokens(tokens);
+      setOnedriveUser(user);
+      localStorage.setItem("onedrive_tokens", JSON.stringify(tokens));
+      localStorage.setItem("onedrive_user", JSON.stringify(user));
+      localStorage.setItem("onedrive_sync_error", "false");
+
+      setOneDriveSyncMessage({
+        type: "success",
+        text: `Zalogowano pomyślnie jako ${user.displayName}. Połączono z OneDrive!`
+      });
+
+      toastSuccess(`Zalogowano pomyślnie jako ${user.displayName}!`);
+      fetchOneDriveData(tokens.access_token);
     } catch (err: any) {
+      console.error(err);
       setOneDriveSyncMessage({
         type: "error",
-        text: `Błąd inicjalizacji: ${err.message || err}`
+        text: `Błąd logowania Microsoft MSAL: ${err.message || err}`
       });
+      toastError(`Błąd logowania: ${err.message || err}`);
     }
   };
 
