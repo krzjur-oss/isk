@@ -135,6 +135,187 @@ Zwróć dane w formacie JSON pasującym do tego schematu. Nie dodawaj żadnych z
     }
   });
 
+  // Microsoft OneDrive OAuth Endpoints
+  // 1. Generate Auth URL
+  app.get("/api/auth/microsoft/url", (req, res) => {
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    if (!clientId) {
+      return res.status(400).json({ 
+        error: "Brak skonfigurowanego MICROSOFT_CLIENT_ID w sekretach aplikacji w AI Studio." 
+      });
+    }
+
+    // Determine redirect URI
+    const origin = (req.query.origin as string) || process.env.APP_URL || "http://localhost:3000";
+    const redirectUri = `${origin.replace(/\/$/, "")}/api/auth/microsoft/callback`;
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      response_type: "code",
+      redirect_uri: redirectUri,
+      response_mode: "query",
+      scope: "files.readwrite offline_access User.Read",
+      state: "onedrive-sync"
+    });
+
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+    res.json({ url: authUrl });
+  });
+
+  // 2. Auth Callback Handler
+  app.get("/api/auth/microsoft/callback", async (req, res) => {
+    const { code } = req.query;
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+
+    if (!code || !clientId) {
+      return res.send(`
+        <html>
+          <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #0f172a; color: #f8fafc;">
+            <h2 style="color: #ef4444;">Błąd Autoryzacji</h2>
+            <p>Brak kodu autoryzacji lub Client ID.</p>
+            <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; background: #3b82f6; border: none; color: white; border-radius: 5px; cursor: pointer;">Zamknij</button>
+          </body>
+        </html>
+      `);
+    }
+
+    try {
+      // Reconstruct the exact redirect URI sent in the authorization request
+      const protocol = req.headers["x-forwarded-proto"] || "http";
+      const host = req.headers["host"] || "localhost:3000";
+      const redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
+
+      const tokenParams = new URLSearchParams({
+        client_id: clientId,
+        scope: "files.readwrite offline_access User.Read",
+        code: code as string,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code"
+      });
+
+      if (clientSecret) {
+        tokenParams.append("client_secret", clientSecret);
+      }
+
+      const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenParams.toString()
+      });
+
+      const tokenData: any = await tokenResponse.json();
+
+      if (tokenData.error) {
+        throw new Error(tokenData.error_description || tokenData.error);
+      }
+
+      // Fetch user profile from Microsoft Graph
+      let displayName = "Użytkownik Szkolny Microsoft 365";
+      let principalName = "szkola@onedrive.com";
+      try {
+        const userProfileRes = await fetch("https://graph.microsoft.com/v1.0/me", {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        if (userProfileRes.ok) {
+          const profile = await userProfileRes.json();
+          displayName = profile.displayName || displayName;
+          principalName = profile.userPrincipalName || profile.mail || principalName;
+        }
+      } catch (profileErr) {
+        console.error("Nie udało się pobrać profilu użytkownika MS Graph:", profileErr);
+      }
+
+      // Return tokens and profile to frontend using postMessage
+      res.send(`
+        <html>
+          <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #0f172a; color: #f8fafc;">
+            <div style="max-width: 400px; margin: 0 auto; border: 1px solid #334155; padding: 30px; border-radius: 12px; background: #1e293b; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);">
+              <div style="font-size: 48px; margin-bottom: 20px;">☁️</div>
+              <h2 style="color: #3b82f6; margin-top: 0;">Autoryzacja udana!</h2>
+              <p style="color: #94a3b8; font-size: 14px;">Zalogowano pomyślnie jako:<br><strong style="color: #f1f5f9;">${displayName}</strong> (${principalName})</p>
+              <p style="color: #64748b; font-size: 12px; margin-top: 20px;">Trwa łączenie z panelem Scanventory. To okno zamknie się automatycznie.</p>
+            </div>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ 
+                  type: 'MS_AUTH_SUCCESS', 
+                  tokens: ${JSON.stringify(tokenData)},
+                  user: { displayName: ${JSON.stringify(displayName)}, principalName: ${JSON.stringify(principalName)} }
+                }, '*');
+                setTimeout(() => {
+                  window.close();
+                }, 1000);
+              } else {
+                window.location.href = '/';
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error("Błąd wymiany tokenu Microsoft:", error);
+      res.send(`
+        <html>
+          <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #0f172a; color: #f8fafc;">
+            <div style="max-width: 400px; margin: 0 auto; border: 1px solid #ef4444; padding: 30px; border-radius: 12px; background: #1e293b;">
+              <div style="font-size: 48px; color: #ef4444; margin-bottom: 20px;">⚠️</div>
+              <h2 style="color: #ef4444; margin-top: 0;">Błąd Autoryzacji Microsoft</h2>
+              <p style="color: #94a3b8; font-size: 14px; text-align: left; background: #0f172a; padding: 12px; border-radius: 6px; font-family: monospace;">${error.message || error}</p>
+              <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; background: #ef4444; border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer;">Zamknij okno</button>
+            </div>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'MS_AUTH_ERROR', error: ${JSON.stringify(error.message || error)} }, '*');
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // 3. Token Refresh Handler
+  app.post("/api/auth/microsoft/refresh", async (req, res) => {
+    const { refresh_token } = req.body;
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+
+    if (!refresh_token || !clientId) {
+      return res.status(400).json({ error: "Brak tokenu odświeżania (refresh_token) lub Client ID." });
+    }
+
+    try {
+      const tokenParams = new URLSearchParams({
+        client_id: clientId,
+        scope: "files.readwrite offline_access User.Read",
+        refresh_token: refresh_token,
+        grant_type: "refresh_token"
+      });
+
+      if (clientSecret) {
+        tokenParams.append("client_secret", clientSecret);
+      }
+
+      const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenParams.toString()
+      });
+
+      const tokenData: any = await tokenResponse.json();
+
+      if (tokenData.error) {
+        throw new Error(tokenData.error_description || tokenData.error);
+      }
+
+      res.json(tokenData);
+    } catch (error: any) {
+      console.error("Błąd odświeżania tokenu Microsoft:", error);
+      res.status(500).json({ error: error.message || "Failed to refresh token" });
+    }
+  });
+
   // Handle Vite Dev Server or Production Static Files
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in DEVELOPMENT mode with Vite...");

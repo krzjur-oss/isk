@@ -131,6 +131,40 @@ export default function App() {
   const saveItemsToDatabase = (newItems: InventoryItem[]) => {
     setItems(newItems);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newItems));
+
+    // Optional background auto-sync to Microsoft OneDrive
+    if (localStorage.getItem("onedrive_auto_sync") === "true") {
+      const storedTokens = localStorage.getItem("onedrive_tokens");
+      if (storedTokens) {
+        try {
+          const { access_token } = JSON.parse(storedTokens);
+          if (access_token) {
+            fetch("https://graph.microsoft.com/v1.0/me/drive/root:/Scanventory/inventory.json:/content", {
+              method: "PUT",
+              headers: {
+                "Authorization": `Bearer ${access_token}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(newItems)
+            })
+            .then(res => {
+              if (res.ok) {
+                const nowStr = new Date().toLocaleString("pl-PL");
+                localStorage.setItem("onedrive_last_sync", nowStr);
+                console.log("Automatic OneDrive synchronization succeeded at " + nowStr);
+              } else {
+                console.warn("Automatic OneDrive sync returned status " + res.status);
+              }
+            })
+            .catch(err => {
+              console.error("Automatic OneDrive sync failed:", err);
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing OneDrive tokens for auto-sync:", e);
+        }
+      }
+    }
   };
 
   const handleSaveItem = (itemData: Omit<InventoryItem, "id" | "addedAt" | "lastModifiedAt"> & { id?: string }) => {
