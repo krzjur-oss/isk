@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { InventoryItem, HardwareStatus, HardwareCategory } from "../types";
 import { useToast } from "./Toast";
-import { msalInstance, getToken } from "../msalConfig";
+import { msalInstance, getToken, ensureMsalInit } from "../msalConfig";
 import { 
   QrCode, BarChart3, MapPin, Trash2, Printer, Download, Check, 
   AlertTriangle, ShieldCheck, User, Calendar, FileText, FileSignature, 
@@ -770,11 +770,12 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   const handleConnectOneDrive = async () => {
     setOneDriveSyncMessage({ type: "info", text: "Trwa uruchamianie połączenia z Microsoft 365..." });
     try {
-      const loginRequest = {
-        scopes: ["Files.ReadWrite", "Files.ReadWrite.All", "User.Read"]
-      };
-
-      const response = await msalInstance.loginPopup(loginRequest);
+       const loginRequest = {
+         scopes: ["Files.ReadWrite", "Files.ReadWrite.All", "User.Read"]
+       };
+ 
+       await ensureMsalInit();
+       const response = await msalInstance.loginPopup(loginRequest);
       console.log("Zalogowano jako:", response.account.username);
 
       const user = {

@@ -8,7 +8,7 @@ import AboutApp from "./components/AboutApp";
 import AdvancedFeatures from "./components/AdvancedFeatures";
 import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle } from "lucide-react";
 import { ToastProvider, useToast } from "./components/Toast";
-import { msalInstance, getToken } from "./msalConfig";
+import { msalInstance, getToken, ensureMsalInit } from "./msalConfig";
 
 const LOCAL_STORAGE_KEY = "it_inventory_items_v1";
 
@@ -242,6 +242,7 @@ function AppContent() {
         scopes: ["Files.ReadWrite", "Files.ReadWrite.All", "User.Read"]
       };
 
+      await ensureMsalInit();
       const response = await msalInstance.loginPopup(loginRequest);
       console.log("Zalogowano jako:", response.account.username);
 

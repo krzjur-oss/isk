@@ -14,8 +14,24 @@ export const msalConfig = {
 
 export const msalInstance = new msal.PublicClientApplication(msalConfig);
 
+let msalInitPromise: Promise<void> | null = null;
+
+export function ensureMsalInit(): Promise<void> {
+    if (!msalInitPromise) {
+        msalInitPromise = msalInstance.initialize().catch(err => {
+            msalInitPromise = null;
+            throw err;
+        });
+    }
+    return msalInitPromise;
+}
+
 export async function getToken() {
+    await ensureMsalInit();
     const account = msalInstance.getAllAccounts()[0];
+    if (!account) {
+        throw new Error("Brak zalogowanego konta Microsoft 365 (MSAL).");
+    }
 
     const tokenRequest = {
         scopes: ["Files.ReadWrite", "Files.ReadWrite.All"],
