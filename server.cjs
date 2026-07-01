@@ -24,6 +24,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server.ts
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
+var import_fs = __toESM(require("fs"), 1);
 var import_vite = require("vite");
 var import_genai = require("@google/genai");
 var import_dotenv = __toESM(require("dotenv"), 1);
@@ -287,6 +288,40 @@ Zwr\xF3\u0107 dane w formacie JSON pasuj\u0105cym do tego schematu. Nie dodawaj 
     } catch (error) {
       console.error("B\u0142\u0105d od\u015Bwie\u017Cania tokenu Microsoft:", error);
       res.status(500).json({ error: error.message || "Failed to refresh token" });
+    }
+  });
+  app.get("/api/build-info", (req, res) => {
+    try {
+      const filesToCheck = [
+        import_path.default.join(process.cwd(), "src/App.tsx"),
+        import_path.default.join(process.cwd(), "src/components/AboutApp.tsx"),
+        import_path.default.join(process.cwd(), "src/components/HardwareList.tsx"),
+        import_path.default.join(process.cwd(), "src/components/AdvancedFeatures.tsx"),
+        import_path.default.join(process.cwd(), "server.ts"),
+        import_path.default.join(process.cwd(), "package.json")
+      ];
+      let maxMtime = 0;
+      filesToCheck.forEach((file) => {
+        try {
+          if (import_fs.default.existsSync(file)) {
+            const stats = import_fs.default.statSync(file);
+            if (stats.mtimeMs > maxMtime) {
+              maxMtime = stats.mtimeMs;
+            }
+          }
+        } catch (e) {
+        }
+      });
+      const finalTime = maxMtime > 0 ? new Date(maxMtime) : /* @__PURE__ */ new Date();
+      res.json({
+        lastModified: finalTime.toISOString(),
+        version: "1.2.0"
+      });
+    } catch (error) {
+      res.json({
+        lastModified: (/* @__PURE__ */ new Date()).toISOString(),
+        version: "1.2.0"
+      });
     }
   });
   if (process.env.NODE_ENV !== "production") {
