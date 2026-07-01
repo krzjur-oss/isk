@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar, Database } from "lucide-react";
+import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar, Database, QrCode, Printer, Download, Copy, Check, X } from "lucide-react";
 import { generateInventoryPDF } from "../utils/pdfGenerator";
+import QRCode from "qrcode";
 
 // Helper map to map CSV headers to InventoryItem keys (case-insensitive and Polish-compatible)
 const headerMapping: Record<string, keyof InventoryItem> = {
@@ -143,6 +144,192 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [onlyOver3Years, setOnlyOver3Years] = useState(false);
+
+  // QR Code states
+  const [qrItem, setQrItem] = useState<InventoryItem | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const [qrContentType, setQrContentType] = useState<"standard" | "sn" | "id">("standard");
+  const [copiedText, setCopiedText] = useState(false);
+
+  useEffect(() => {
+    if (!qrItem) {
+      setQrCodeUrl("");
+      return;
+    }
+    
+    let text = "";
+    if (qrContentType === "standard") {
+      text = `SKANWENTARZ IT\nID: ${qrItem.id}\nSprzęt: ${qrItem.manufacturer} ${qrItem.model}\nS/N: ${qrItem.serialNumber || 'brak'}\nKategoria: ${qrItem.category}\nSala: ${qrItem.room || 'brak'}`;
+    } else if (qrContentType === "sn") {
+      text = qrItem.serialNumber || qrItem.id;
+    } else if (qrContentType === "id") {
+      text = qrItem.id;
+    }
+    
+    QRCode.toDataURL(text, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: "#1e293b", // Slate 800
+        light: "#ffffff"
+      }
+    })
+    .then(url => {
+      setQrCodeUrl(url);
+    })
+    .catch(err => {
+      console.error("Błąd generowania kodu QR:", err);
+    });
+  }, [qrItem, qrContentType]);
+
+  const handleCopyText = () => {
+    if (!qrItem) return;
+    let text = "";
+    if (qrContentType === "standard") {
+      text = `SKANWENTARZ IT\nID: ${qrItem.id}\nSprzęt: ${qrItem.manufacturer} ${qrItem.model}\nS/N: ${qrItem.serialNumber || 'brak'}\nKategoria: ${qrItem.category}\nSala: ${qrItem.room || 'brak'}`;
+    } else if (qrContentType === "sn") {
+      text = qrItem.serialNumber || qrItem.id;
+    } else if (qrContentType === "id") {
+      text = qrItem.id;
+    }
+    
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopiedText(true);
+        setTimeout(() => setCopiedText(false), 2000);
+      })
+      .catch(err => {
+        console.error("Błąd kopiowania:", err);
+      });
+  };
+
+  const handleDownloadQr = () => {
+    if (!qrItem || !qrCodeUrl) return;
+    const link = document.createElement("a");
+    link.href = qrCodeUrl;
+    link.download = `qr_${qrItem.manufacturer.toLowerCase()}_${qrItem.model.toLowerCase()}_${qrItem.serialNumber || qrItem.id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrintLabel = () => {
+    if (!qrItem || !qrCodeUrl) return;
+    
+    const printWindow = window.open("", "_blank", "width=600,height=400");
+    if (!printWindow) {
+      alert("Wyskakujące okno zostało zablokowane! Zezwól na wyskakujące okna dla tej witryny.");
+      return;
+    }
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Drukuj Etykietę - ${qrItem.manufacturer} ${qrItem.model}</title>
+          <style>
+            @page {
+              size: auto;
+              margin: 0;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              margin: 0;
+              padding: 15px;
+              background-color: white;
+              color: #1e293b;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              box-sizing: border-box;
+            }
+            .label-container {
+              border: 2px solid #e2e8f0;
+              padding: 15px;
+              border-radius: 8px;
+              width: 380px;
+              background: white;
+              display: flex;
+              gap: 15px;
+              align-items: center;
+              box-sizing: border-box;
+            }
+            .qr-img {
+              width: 120px;
+              height: 120px;
+              display: block;
+            }
+            .details {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+              font-size: 11px;
+              line-height: 1.3;
+              overflow: hidden;
+            }
+            .title {
+              font-weight: bold;
+              font-size: 13px;
+              color: #0f172a;
+              margin-bottom: 2px;
+              border-bottom: 1px solid #cbd5e1;
+              padding-bottom: 3px;
+            }
+            .bold {
+              font-weight: bold;
+              color: #334155;
+            }
+            .tag {
+              background-color: #f1f5f9;
+              padding: 1px 4px;
+              border-radius: 3px;
+              font-family: monospace;
+              font-size: 10px;
+            }
+            .footer {
+              font-size: 8px;
+              color: #94a3b8;
+              margin-top: 5px;
+              font-family: monospace;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              .label-container {
+                border: none;
+                width: 100%;
+                max-width: 100%;
+                height: auto;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="label-container">
+            <div>
+              <img class="qr-img" src="${qrCodeUrl}" />
+            </div>
+            <div class="details">
+              <div class="title">SKANWENTARZ IT</div>
+              <div><span class="bold">Sprzęt:</span> ${qrItem.manufacturer} ${qrItem.model}</div>
+              <div><span class="bold">S/N:</span> <span class="tag">${qrItem.serialNumber || 'brak'}</span></div>
+              <div><span class="bold">Kategoria:</span> ${qrItem.category}</div>
+              <div><span class="bold">Sala:</span> ${qrItem.room || 'brak'}</div>
+              <div class="footer">ID: ${qrItem.id}</div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   // Filter items based on criteria
   const filteredItems = items.filter(item => {
@@ -442,6 +629,13 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => { setQrItem(item); setQrContentType("standard"); }}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 rounded-lg transition-colors cursor-pointer"
+                          title="Etykieta i Kod QR"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => onEdit(item)}
                           className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 rounded-lg transition-colors cursor-pointer"
                           title="Edytuj sprzęt"
@@ -464,6 +658,142 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
           </table>
         )}
       </div>
+
+      {/* QR Code and Asset Label Modal */}
+      {qrItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-100 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-150 relative">
+            
+            {/* Close button */}
+            <button
+              onClick={() => setQrItem(null)}
+              className="absolute right-4 top-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600 shrink-0">
+                <QrCode className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Etykieta i Kod QR Zasobu</h3>
+                <p className="text-xs text-slate-500">Generuj unikalny kod do szybkiego skanowania w biurze/szkole</p>
+              </div>
+            </div>
+
+            {/* Selector for QR Code Content */}
+            <div className="mb-4">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Treść kodu QR</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setQrContentType("standard")}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                    qrContentType === "standard"
+                      ? "bg-blue-50 border-blue-200 text-blue-700 shadow-xs"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Pełna specyfikacja
+                </button>
+                <button
+                  onClick={() => setQrContentType("sn")}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                    qrContentType === "sn"
+                      ? "bg-blue-50 border-blue-200 text-blue-700 shadow-xs"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Tylko S/N
+                </button>
+                <button
+                  onClick={() => setQrContentType("id")}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                    qrContentType === "id"
+                      ? "bg-blue-50 border-blue-200 text-blue-700 shadow-xs"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Tylko ID zasobu
+                </button>
+              </div>
+            </div>
+
+            {/* Asset Label Card (Printable Layout Preview) */}
+            <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 mb-5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Podgląd etykiety środka trwałego</label>
+              
+              <div id="asset-label-preview" className="bg-white border-2 border-slate-200 rounded-lg p-4 flex flex-col sm:flex-row gap-4 items-center shadow-sm select-none">
+                {/* QR Code Container */}
+                <div className="w-32 h-32 flex-shrink-0 bg-slate-50 border border-slate-100 rounded-md overflow-hidden flex items-center justify-center">
+                  {qrCodeUrl ? (
+                    <img src={qrCodeUrl} alt="QR Code" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-slate-300">Generowanie...</span>
+                  )}
+                </div>
+
+                {/* Detail Section */}
+                <div className="flex-1 text-xs text-slate-600 space-y-1.5 w-full">
+                  <div className="font-extrabold text-sm text-slate-900 border-b border-slate-100 pb-1 flex items-center justify-between">
+                    <span>SKANWENTARZ IT</span>
+                    <span className="text-[9px] bg-slate-100 text-slate-500 font-mono px-1 rounded uppercase">Etykieta</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500">Sprzęt: </span>
+                    <span className="text-slate-800 font-semibold">{qrItem.manufacturer} {qrItem.model}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500">S/N: </span>
+                    <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-semibold">{qrItem.serialNumber || "brak"}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500">Kategoria: </span>
+                    <span className="text-slate-700 font-medium">{qrItem.category}</span>
+                  </div>
+                  {qrItem.room && (
+                    <div>
+                      <span className="font-bold text-slate-500">Sala: </span>
+                      <span className="text-blue-700 font-semibold">{qrItem.room}</span>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-slate-400 font-mono pt-1">
+                    ID: {qrItem.id}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                onClick={handleCopyText}
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                {copiedText ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                {copiedText ? "Skopiowano!" : "Kopiuj tekst kodu"}
+              </button>
+              
+              <button
+                onClick={handleDownloadQr}
+                className="w-full sm:w-auto px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Pobierz PNG
+              </button>
+
+              <button
+                onClick={handlePrintLabel}
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Printer className="h-4 w-4" />
+                Drukuj etykietę
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
