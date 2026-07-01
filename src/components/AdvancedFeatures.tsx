@@ -96,6 +96,32 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   const [dragActive, setDragActive] = useState(false);
   const [copiedLabelId, setCopiedLabelId] = useState<string | null>(null);
 
+  // Custom client-side school OneDrive connection states
+  const [useCustomOneDrive, setUseCustomOneDrive] = useState<boolean>(() => {
+    return localStorage.getItem("onedrive_use_custom") === "true";
+  });
+  const [customClientId, setCustomClientId] = useState<string>(() => {
+    return localStorage.getItem("onedrive_custom_client_id") || "";
+  });
+  const [customTenantId, setCustomTenantId] = useState<string>(() => {
+    return localStorage.getItem("onedrive_custom_tenant_id") || "common";
+  });
+
+  const handleToggleUseCustom = (val: boolean) => {
+    setUseCustomOneDrive(val);
+    localStorage.setItem("onedrive_use_custom", val ? "true" : "false");
+  };
+
+  const handleCustomClientIdChange = (val: string) => {
+    setCustomClientId(val);
+    localStorage.setItem("onedrive_custom_client_id", val);
+  };
+
+  const handleCustomTenantIdChange = (val: string) => {
+    setCustomTenantId(val);
+    localStorage.setItem("onedrive_custom_tenant_id", val);
+  };
+
   // 4. Room Auditor State
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>("all");
   const [bulkMoveTarget, setBulkMoveTarget] = useState<string>("");
@@ -194,7 +220,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   useEffect(() => {
     const handleOAuthMessage = (event: MessageEvent) => {
       const origin = event.origin;
-      if (!origin.endsWith(".run.app") && !origin.includes("localhost") && !origin.includes("3000")) {
+      if (origin !== window.location.origin && !origin.endsWith(".run.app") && !origin.includes("localhost") && !origin.includes("3000")) {
         return;
       }
       
@@ -407,13 +433,30 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
   const handleConnectOneDrive = async () => {
     setOneDriveSyncMessage({ type: "info", text: "Trwa uruchamianie połączenia z Microsoft 365..." });
     try {
-      const origin = window.location.origin;
-      const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
+      let url = "";
+      if (useCustomOneDrive) {
+        if (!customClientId.trim()) {
+          throw new Error("Wpisz Identyfikator aplikacji (Client ID) swojej szkoły!");
+        }
+        const tenant = customTenantId.trim() || "common";
+        const params = new URLSearchParams({
+          client_id: customClientId.trim(),
+          response_type: "token",
+          redirect_uri: window.location.origin + window.location.pathname,
+          scope: "files.readwrite User.Read",
+          state: "onedrive-custom-sync"
+        });
+        url = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?${params.toString()}`;
+      } else {
+        const origin = window.location.origin;
+        const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
+        }
+        const { url: apiConfiguredUrl } = await response.json();
+        url = apiConfiguredUrl;
       }
-      const { url } = await response.json();
       
       const width = 600;
       const height = 650;
@@ -1498,6 +1541,22 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
             </div>
           )}
 
+          {/* Information card for users without admin consent */}
+          <div className="bg-amber-50/75 border border-amber-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-start animate-in slide-in-from-top duration-300">
+            <div className="p-2.5 bg-amber-100 rounded-lg text-amber-700 shrink-0">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="space-y-1.5 text-left">
+              <h4 className="text-xs sm:text-sm font-bold text-amber-900">Brak zgody administratora szkolnego IT? (Błąd autoryzacji / Konsoli)</h4>
+              <p className="text-xs text-amber-850 leading-relaxed">
+                Konta Microsoft 365 w szkołach są bardzo rygorystycznie zabezpieczone przez administratorów. Standardowi użytkownicy (nauczyciele, uczniowie) mają zablokowaną możliwość rejestracji własnych aplikacji oraz logowania się przez zewnętrzne integracje API bez zgody globalnej IT.
+              </p>
+              <p className="text-xs font-bold text-amber-950 mt-1">
+                Rozwiązanie: Skorzystaj z "Metody B" (Folder OneDrive) po prawej stronie! Jest w 100% niezawodna, darmowa i nie wymaga żadnej rejestracji, zgód ani kluczy.
+              </p>
+            </div>
+          </div>
+
           {/* Dual column integration layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* COLUMN A: AUTOMATIC GRAPH API */}
@@ -1567,10 +1626,69 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
                 ) : (
                   /* Welcome connection button and setup info */
                   <div className="space-y-4">
+                    {/* Choose application mode */}
+                    <div className="bg-slate-50 border border-slate-150 rounded-lg p-3.5 space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">Typ aplikacji Microsoft:</span>
+                        <div className="flex gap-1 bg-slate-200 p-0.5 rounded-md text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUseCustom(false)}
+                            className={`px-2 py-1 rounded transition-all font-bold cursor-pointer ${!useCustomOneDrive ? "bg-white text-slate-800 shadow-xs" : "text-slate-500 hover:text-slate-800"}`}
+                          >
+                            Domyślna (Serwer)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUseCustom(true)}
+                            className={`px-2 py-1 rounded transition-all font-bold cursor-pointer ${useCustomOneDrive ? "bg-white text-slate-800 shadow-xs" : "text-slate-500 hover:text-slate-800"}`}
+                          >
+                            Własna szkoły (Client-Side)
+                          </button>
+                        </div>
+                      </div>
+
+                      {useCustomOneDrive && (
+                        <div className="space-y-2 border-t border-slate-150 pt-2 animate-in fade-in duration-200">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                              Identyfikator aplikacji (Client ID) szkoły:
+                            </label>
+                            <input
+                              type="text"
+                              value={customClientId}
+                              onChange={(e) => handleCustomClientIdChange(e.target.value)}
+                              placeholder="np. e72e591c-99d9-43c2-8495-..."
+                              className="w-full text-xs font-mono p-2 bg-white border border-slate-200 rounded focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                              Identyfikator dzierżawy (Tenant ID) lub "common":
+                            </label>
+                            <input
+                              type="text"
+                              value={customTenantId}
+                              onChange={(e) => handleCustomTenantIdChange(e.target.value)}
+                              placeholder="common (zalecane) lub ID dzierżawy szkoły"
+                              className="w-full text-xs font-mono p-2 bg-white border border-slate-200 rounded focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <p className="text-[9px] text-amber-750 bg-amber-50/70 p-2.5 rounded leading-relaxed border border-amber-100">
+                            <strong>Ważne:</strong> Zarejestruj aplikację w portalu Azure AD (Entra ID) jako <strong>Single-page application (SPA)</strong> z adresem zwrotnym (Redirect URI) ustawionym na:<br/>
+                            <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono font-bold select-all block text-center mt-1 break-all">{window.location.origin + window.location.pathname}</code>
+                            Nie potrzebujesz generować żadnego klucza (Client Secret)! To połączenie jest w 100% bezpieczne i wykonuje się całkowicie w Twojej przeglądarce.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-lg text-amber-900 text-xs flex gap-2">
                       <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                       <p>
-                        Wymaga posiadania Client ID dla Azure Active Directory (szkoła). Jeżeli administrator Twojej szkoły nie skonfigurował jeszcze domyślnej integracji, skorzystaj z instrukcji poniżej, aby dodać bezpłatną rejestrację aplikacji!
+                        {useCustomOneDrive 
+                          ? "Skonfigurowano własną aplikację szkolną. Kliknij przycisk poniżej, aby połączyć się z Twoim szkolnym dyskiem OneDrive bezpośrednio z przeglądarki (bez serwera)." 
+                          : "Wymaga posiadania Client ID dla Azure Active Directory (szkoła). Jeżeli administrator Twojej szkoły nie skonfigurował jeszcze domyślnej integracji, skorzystaj z instrukcji poniżej, aby dodać bezpłatną rejestrację aplikacji!"}
                       </p>
                     </div>
 

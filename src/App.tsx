@@ -122,6 +122,68 @@ export default function App() {
     return localStorage.getItem("onedrive_sync_error") === "true";
   });
 
+  // Check for client-side custom OneDrive OAuth token redirect hash
+  useEffect(() => {
+    const handleHashAuth = async () => {
+      const hash = window.location.hash;
+      if (!hash) return;
+      
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get("access_token");
+      const state = params.get("state");
+      
+      if (accessToken && (state === "onedrive-custom-sync" || state === "onedrive-sync")) {
+        // Clear hash immediately so URL looks clean
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        
+        try {
+          // Fetch user details from Microsoft Graph using the access token
+          const userRes = await fetch("https://graph.microsoft.com/v1.0/me", {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          
+          if (userRes.ok) {
+            const profile = await userRes.json();
+            const user = {
+              displayName: profile.displayName || "Użytkownik Microsoft 365",
+              principalName: profile.userPrincipalName || profile.mail || "szkola@onedrive.com"
+            };
+            
+            const expires_in = params.get("expires_in") || "3600";
+            const expiresAt = Date.now() + parseInt(expires_in) * 1000;
+            
+            const tokens = {
+              access_token: accessToken,
+              expires_at: expiresAt,
+              is_custom: true
+            };
+            
+            localStorage.setItem("onedrive_tokens", JSON.stringify(tokens));
+            localStorage.setItem("onedrive_user", JSON.stringify(user));
+            localStorage.setItem("onedrive_sync_error", "false");
+            
+            const targetWindow = window.opener || window;
+            targetWindow.postMessage({ 
+              type: 'MS_AUTH_SUCCESS', 
+              tokens, 
+              user 
+            }, '*');
+
+            if (window.opener) {
+              setTimeout(() => {
+                window.close();
+              }, 1000);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to parse custom OAuth token:", err);
+        }
+      }
+    };
+    
+    handleHashAuth();
+  }, []);
+
   // Track OneDrive profile changes in real-time
   useEffect(() => {
     const handleStorageChange = () => {
@@ -133,7 +195,7 @@ export default function App() {
 
     const handleOAuthMessage = (event: MessageEvent) => {
       const origin = event.origin;
-      if (!origin.endsWith(".run.app") && !origin.includes("localhost") && !origin.includes("3000")) {
+      if (origin !== window.location.origin && !origin.endsWith(".run.app") && !origin.includes("localhost") && !origin.includes("3000")) {
         return;
       }
       if (event.data?.type === "MS_AUTH_SUCCESS") {
@@ -165,13 +227,34 @@ export default function App() {
 
   const handleConnectOneDrive = async () => {
     try {
-      const origin = window.location.origin;
-      const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
+      const useCustom = localStorage.getItem("onedrive_use_custom") === "true";
+      let url = "";
+      
+      if (useCustom) {
+        const customClientId = localStorage.getItem("onedrive_custom_client_id") || "";
+        const customTenantId = localStorage.getItem("onedrive_custom_tenant_id") || "common";
+        if (!customClientId.trim()) {
+          alert("Wpisz najpierw swój szkolny Client ID w zakładce 'Usprawnienia i raporty' -> 'Chmura OneDrive'!");
+          return;
+        }
+        const params = new URLSearchParams({
+          client_id: customClientId.trim(),
+          response_type: "token",
+          redirect_uri: window.location.origin + window.location.pathname,
+          scope: "files.readwrite User.Read",
+          state: "onedrive-custom-sync"
+        });
+        url = `https://login.microsoftonline.com/${customTenantId}/oauth2/v2.0/authorize?${params.toString()}`;
+      } else {
+        const origin = window.location.origin;
+        const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
+        }
+        const { url: apiConfiguredUrl } = await response.json();
+        url = apiConfiguredUrl;
       }
-      const { url } = await response.json();
       
       const width = 600;
       const height = 650;
