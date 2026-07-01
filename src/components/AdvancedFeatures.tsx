@@ -282,6 +282,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
         const nowStr = new Date().toLocaleString("pl-PL");
         setOneDriveLastSync(nowStr);
         localStorage.setItem("onedrive_last_sync", nowStr);
+        localStorage.setItem("onedrive_sync_error", "false");
         setOneDriveSyncMessage({
           type: "success",
           text: `Pomyślnie zsynchronizowano z OneDrive! Zapisano ${items.length} urządzeń o ${nowStr}.`
@@ -294,10 +295,12 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
             return;
           }
         }
+        localStorage.setItem("onedrive_sync_error", "true");
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData?.error?.message || `HTTP status ${response.status}`);
       }
     } catch (err: any) {
+      localStorage.setItem("onedrive_sync_error", "true");
       console.error("OneDrive upload error:", err);
       setOneDriveSyncMessage({
         type: "error",
@@ -325,6 +328,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
           const nowStr = new Date().toLocaleString("pl-PL");
           setOneDriveLastSync(nowStr);
           localStorage.setItem("onedrive_last_sync", nowStr);
+          localStorage.setItem("onedrive_sync_error", "false");
           setOneDriveSyncMessage({
             type: "success",
             text: `Pomyślnie zaimportowano ${data.length} urządzeń z OneDrive! Stan lokalny został zaktualizowany.`
@@ -340,10 +344,12 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
             return;
           }
         }
+        localStorage.setItem("onedrive_sync_error", "true");
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData?.error?.message || `Brak pliku na OneDrive lub błąd HTTP ${response.status}`);
       }
     } catch (err: any) {
+      localStorage.setItem("onedrive_sync_error", "true");
       console.error("OneDrive download error:", err);
       setOneDriveSyncMessage({
         type: "error",
@@ -391,6 +397,7 @@ export default function AdvancedFeatures({ items, onUpdateItems }: AdvancedFeatu
     localStorage.removeItem("onedrive_user");
     localStorage.removeItem("onedrive_last_sync");
     localStorage.removeItem("onedrive_auto_sync");
+    localStorage.removeItem("onedrive_sync_error");
     setOneDriveSyncMessage({
       type: "info",
       text: "Wylogowano z konta OneDrive."

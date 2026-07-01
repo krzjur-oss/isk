@@ -6,7 +6,7 @@ import HardwareList from "./components/HardwareList";
 import ReplacementManager from "./components/ReplacementManager";
 import AboutApp from "./components/AboutApp";
 import AdvancedFeatures from "./components/AdvancedFeatures";
-import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info } from "lucide-react";
+import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "it_inventory_items_v1";
 
@@ -111,6 +111,97 @@ export default function App() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"inventory" | "replacements" | "about" | "improvements">("inventory");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [onedriveUser, setOnedriveUser] = useState<any>(() => {
+    const stored = localStorage.getItem("onedrive_user");
+    return stored ? JSON.parse(stored) : null;
+  });
+  const [oneDriveLastSync, setOneDriveLastSync] = useState<string | null>(() => {
+    return localStorage.getItem("onedrive_last_sync");
+  });
+  const [oneDriveSyncError, setOneDriveSyncError] = useState<boolean>(() => {
+    return localStorage.getItem("onedrive_sync_error") === "true";
+  });
+
+  // Track OneDrive profile changes in real-time
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = localStorage.getItem("onedrive_user");
+      setOnedriveUser(stored ? JSON.parse(stored) : null);
+      setOneDriveLastSync(localStorage.getItem("onedrive_last_sync"));
+      setOneDriveSyncError(localStorage.getItem("onedrive_sync_error") === "true");
+    };
+
+    const handleOAuthMessage = (event: MessageEvent) => {
+      const origin = event.origin;
+      if (!origin.endsWith(".run.app") && !origin.includes("localhost") && !origin.includes("3000")) {
+        return;
+      }
+      if (event.data?.type === "MS_AUTH_SUCCESS") {
+        const { tokens, user } = event.data;
+        setOnedriveUser(user);
+        localStorage.setItem("onedrive_tokens", JSON.stringify(tokens));
+        localStorage.setItem("onedrive_user", JSON.stringify(user));
+        localStorage.setItem("onedrive_sync_error", "false");
+        setOneDriveSyncError(false);
+      } else if (event.data?.type === "MS_AUTH_LOGOUT") {
+        setOnedriveUser(null);
+        setOneDriveLastSync(null);
+        setOneDriveSyncError(false);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("message", handleOAuthMessage);
+    
+    // Periodically poll for local storage changes from child components
+    const interval = setInterval(handleStorageChange, 1000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("message", handleOAuthMessage);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleConnectOneDrive = async () => {
+    try {
+      const origin = window.location.origin;
+      const response = await fetch(`/api/auth/microsoft/url?origin=${encodeURIComponent(origin)}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Nie udało się uzyskać URL autoryzacji.");
+      }
+      const { url } = await response.json();
+      
+      const width = 600;
+      const height = 650;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+        url,
+        "microsoft_oauth_popup",
+        `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes`
+      );
+      
+      if (!popup) {
+        alert("Wyskakujące okno zostało zablokowane przez przeglądarkę! Zezwól na wyskakujące okna dla tej witryny.");
+      }
+    } catch (err: any) {
+      alert(`Błąd inicjalizacji: ${err.message || err}`);
+    }
+  };
+
+  const handleOneDriveLogout = () => {
+    localStorage.removeItem("onedrive_tokens");
+    localStorage.removeItem("onedrive_user");
+    localStorage.removeItem("onedrive_last_sync");
+    localStorage.removeItem("onedrive_auto_sync");
+    localStorage.removeItem("onedrive_sync_error");
+    setOnedriveUser(null);
+    setOneDriveSyncError(false);
+    window.postMessage({ type: "MS_AUTH_LOGOUT" }, "*");
+  };
 
   // Load items from local storage or use initial dataset
   useEffect(() => {
@@ -151,12 +242,19 @@ export default function App() {
               if (res.ok) {
                 const nowStr = new Date().toLocaleString("pl-PL");
                 localStorage.setItem("onedrive_last_sync", nowStr);
+                localStorage.setItem("onedrive_sync_error", "false");
+                setOneDriveLastSync(nowStr);
+                setOneDriveSyncError(false);
                 console.log("Automatic OneDrive synchronization succeeded at " + nowStr);
               } else {
+                localStorage.setItem("onedrive_sync_error", "true");
+                setOneDriveSyncError(true);
                 console.warn("Automatic OneDrive sync returned status " + res.status);
               }
             })
             .catch(err => {
+              localStorage.setItem("onedrive_sync_error", "true");
+              setOneDriveSyncError(true);
               console.error("Automatic OneDrive sync failed:", err);
             });
           }
@@ -380,8 +478,61 @@ export default function App() {
               </button>
             </div>
 
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="flex -space-x-1.5">
+            <div className="hidden sm:flex items-center gap-3">
+              {onedriveUser ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-150 rounded-lg px-3 py-1.5 text-xs shadow-xs">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse shrink-0"></div>
+                    <span className="font-bold text-slate-700 max-w-[150px] truncate">{onedriveUser.displayName}</span>
+                    <span className="text-[9px] text-emerald-800 bg-emerald-100 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
+                      <Cloud className="h-2.5 w-2.5" />
+                      OneDrive
+                    </span>
+                    {oneDriveLastSync && (
+                      <span 
+                        className="text-[10px] text-emerald-700 border-l border-emerald-200 pl-2 ml-1 font-semibold shrink-0"
+                        title={`Pełna data ostatniej synchronizacji: ${oneDriveLastSync}`}
+                      >
+                        Zapis: {oneDriveLastSync.split(", ")[1] || oneDriveLastSync}
+                      </span>
+                    )}
+                    {oneDriveSyncError && (
+                      <button 
+                        onClick={() => setActiveTab("improvements")}
+                        className="flex items-center gap-1 text-[9px] sm:text-[10px] text-amber-700 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse cursor-pointer shrink-0 ml-1.5 font-bold"
+                        title="Ostatni auto-zapis nie powiódł się! Dane lokalne uległy zmianie. Kliknij tutaj, aby przejść do zakładki OneDrive i ponowić synchronizację ręcznie."
+                      >
+                        <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                        <span>Błąd zapisu</span>
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleOneDriveLogout}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-150 hover:bg-rose-100 rounded-lg transition-all cursor-pointer"
+                    title="Wyloguj się z OneDrive"
+                  >
+                    <LogOut className="h-3 w-3" />
+                    <span>Wyloguj</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs">
+                    <div className="w-2 h-2 rounded-full bg-slate-400 shrink-0"></div>
+                    <span className="text-slate-500 font-semibold text-[11px]">Baza Lokalna (Offline)</span>
+                  </div>
+                  <button
+                    onClick={handleConnectOneDrive}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-150 hover:bg-emerald-100 rounded-lg transition-all cursor-pointer"
+                    title="Połącz ze szkolnym OneDrive"
+                  >
+                    <LogIn className="h-3 w-3" />
+                    <span>Zaloguj OneDrive</span>
+                  </button>
+                </div>
+              )}
+              <div className="flex -space-x-1.5 shrink-0">
                 <div className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-blue-700">KJ</div>
                 <div className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600">AI</div>
               </div>
