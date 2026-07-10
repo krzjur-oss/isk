@@ -1,10 +1,37 @@
 import React, { useState, useEffect } from "react";
-import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle } from "lucide-react";
+import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle, BookOpen, PlusCircle, Camera, FileDown, Sparkles, ArrowRight, CheckSquare, Square, History, Clock } from "lucide-react";
 
 export default function AboutApp() {
-  const [activeSection, setActiveSection] = useState<"info" | "author" | "terms" | "license">("info");
+  const [activeSection, setActiveSection] = useState<"info" | "guide" | "changelog" | "author" | "terms" | "license">("info");
   const [buildInfo, setBuildInfo] = useState<{ version: string; lastModified: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({
+    step1: false,
+    step2: false,
+    step3: false,
+  });
+
+  useEffect(() => {
+    // Load checklist from localStorage for interactive onboarding feel
+    try {
+      const saved = localStorage.getItem("onboarding_guide_steps");
+      if (saved) {
+        setCompletedSteps(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const toggleStep = (stepId: string) => {
+    const updated = { ...completedSteps, [stepId]: !completedSteps[stepId] };
+    setCompletedSteps(updated);
+    try {
+      localStorage.setItem("onboarding_guide_steps", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/build-info")
@@ -41,6 +68,8 @@ export default function AboutApp() {
 
   const sections = [
     { id: "info", label: "O Programie", icon: Info },
+    { id: "guide", label: "Przewodnik", icon: BookOpen },
+    { id: "changelog", label: "Historia zmian", icon: History },
     { id: "author", label: "O Autorze", icon: User },
     { id: "terms", label: "Regulamin", icon: FileText },
     { id: "license", label: "Licencja", icon: Shield },
@@ -199,6 +228,291 @@ export default function AboutApp() {
                   💡 <strong>Rozwiązanie:</strong> Skopiuj adres URL aplikacji i otwórz go w nowej, czystej karcie przeglądarki (poza ramką testową) z włączonym protokołem HTTPS. Wtedy w przeglądarkach Chrome, Edge, Safari lub Opera pojawi się opcja „Dodaj do ekranu głównego” lub ikona instalacji na pasku adresu.
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION: PRZEWODNIK UŻYTKOWNIKA */}
+        {activeSection === "guide" && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 p-5 rounded-2xl border border-blue-150 flex flex-col md:flex-row items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-md">
+                <BookOpen className="h-6 w-6" />
+              </div>
+              <div className="space-y-1 text-center md:text-left">
+                <h3 className="text-base font-bold text-slate-900">Podręcznik wdrożeniowy dla nowego członka zespołu</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Witaj w zespole administratorów <strong>SCANVENTORY</strong>! Przeczytaj poniższy przewodnik krok po kroku, aby sprawnie poznać podstawowe funkcjonalności systemu i natychmiast rozpocząć inwentaryzację.
+                </p>
+              </div>
+            </div>
+
+            {/* Steps Container */}
+            <div className="relative border-l border-slate-200 ml-4 pl-8 space-y-8 py-2">
+              
+              {/* Step 1 */}
+              <div className="relative">
+                {/* Number / Icon element on the timeline line */}
+                <span className="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-800 shadow-xs">
+                  <PlusCircle className="h-4 w-4 text-blue-600" />
+                </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-semibold">
+                      Krok 1: Dodanie pierwszego sprzętu do bazy
+                      {completedSteps.step1 && (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded border border-emerald-150">Wykonano</span>
+                      )}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => toggleStep("step1")}
+                      className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      {completedSteps.step1 ? <CheckSquare className="h-3.5 w-3.5 text-emerald-600" /> : <Square className="h-3.5 w-3.5" />}
+                      {completedSteps.step1 ? "Oznacz jako niewykonane" : "Oznacz jako zrobione"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Każdy inwentarz zaczyna się od pierwszego rekordu. Aby dodać nowe urządzenie ręcznie, przejdź do głównego widoku <strong className="text-slate-800">„Zasoby i Ewidencja”</strong> i uzupełnij pola w sekcji wprowadzania danych:
+                  </p>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 text-xs text-slate-600 space-y-1.5">
+                    <p>• <strong>Wymagane parametry:</strong> Wpisz nazwę producenta, model, kategorię (np. laptop, monitor, serwer, przełącznik) oraz przypisz status (np. w użyciu, magazyn, uszkodzony).</p>
+                    <p>• <strong>Identyfikacja zasobu:</strong> Podaj unikalny numer seryjny (S/N) urządzenia. System automatycznie sprawdzi, czy dany numer nie widnieje już w bazie, chroniąc przed duplikatami.</p>
+                    <p>• <strong>Historia rotacji (Wymiany):</strong> Jeśli wprowadzany sprzęt bezpośrednio zastępuje starszy komputer (np. podczas modernizacji stanowiska), wybierz stare urządzenie z listy powiązań. Pozwoli to zachować pełną ciągłość historyczną!</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="relative">
+                <span className="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-800 shadow-xs">
+                  <Camera className="h-4 w-4 text-purple-600" />
+                </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-semibold">
+                      Krok 2: Błyskawiczna inwentaryzacja z użyciem OCR AI
+                      {completedSteps.step2 && (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded border border-emerald-150">Wykonano</span>
+                      )}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => toggleStep("step2")}
+                      className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      {completedSteps.step2 ? <CheckSquare className="h-3.5 w-3.5 text-emerald-600" /> : <Square className="h-3.5 w-3.5" />}
+                      {completedSteps.step2 ? "Oznacz jako niewykonane" : "Oznacz jako zrobione"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Nie musisz przepisywać skomplikowanych specyfikacji z małych naklejek znamionowych komputerów! Użyj wbudowanego systemu skanowania opartego na sztucznej inteligencji:
+                  </p>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 text-xs text-slate-600 space-y-1.5">
+                    <p>• <strong>Uruchom aparat:</strong> W formularzu ewidencji (podzakładka „Skaner AI (OCR)”) kliknij przycisk „Zrób zdjęcie aparatem” lub przeciągnij gotowy plik graficzny bezpośrednio na pole wyboru.</p>
+                    <p>• <strong>Automatyczny odczyt Gemini:</strong> Po wykonaniu lub załadowaniu zdjęcia naklejki znamionowej, zintegrowany model <strong>Gemini-3.5-Flash</strong> przeanalizuje obraz, odczyta numer seryjny, nazwę producenta oraz kluczowe parametry techniczne (procesor, pamięć RAM, typ dysku twardego, grafikę, system operacyjny).</p>
+                    <p>• <strong>Weryfikacja:</strong> Odczytane dane zostaną natychmiast uzupełnione w polach formularza. Sprawdź poprawność, dodaj opcjonalne notatki (np. nazwę pokoju), po czym zatwierdź wpis jednym przyciskiem.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="relative">
+                <span className="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-800 shadow-xs">
+                  <FileDown className="h-4 w-4 text-indigo-600" />
+                </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-semibold">
+                      Krok 3: Generowanie raportu PDF dla zarządu lub audytu
+                      {completedSteps.step3 && (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded border border-emerald-150">Wykonano</span>
+                      )}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => toggleStep("step3")}
+                      className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      {completedSteps.step3 ? <CheckSquare className="h-3.5 w-3.5 text-emerald-600" /> : <Square className="h-3.5 w-3.5" />}
+                      {completedSteps.step3 ? "Oznacz jako niewykonane" : "Oznacz jako zrobione"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Gdy zbierzesz dane sprzętowe, możesz szybko wygenerować przejrzyste dokumenty i zestawienia raportowe gotowe do wydruku lub wysyłki:
+                  </p>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 text-xs text-slate-600 space-y-1.5">
+                    <p>• <strong>Filtrowanie i agregacja:</strong> Przejdź do zakładki <strong className="text-slate-800">„Usprawnienia i Raporty”</strong>. Tam zobaczysz m.in. podsumowanie liczby sprzętu, statystyki kategorii oraz rozkład stanu urządzeń.</p>
+                    <p>• <strong>Pobieranie dokumentacji:</strong> W sekcji generatora raportów znajdziesz opcję eksportu. Kliknięcie przycisku <strong>„Generuj raport PDF”</strong> natychmiast skompiluje eleganckie zestawienie inwentaryzacyjne w formacie gotowym do druku (zawierające zestawienie tabelaryczne, statystyki ilościowe, dane o rotacji urządzeń oraz sekcję na podpisy komisji inwentaryzacyjnej).</p>
+                    <p>• <strong>Eksport CSV i Kopia bezpieczeństwa:</strong> Pamiętaj, że dane są zapisywane lokalnie. Użyj opcji eksportu do CSV lub JSON na dole strony, aby zapisać kompletną kopię zapasową bazy danych na dysku zewnętrznym lub serwerze firmowym.</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Quick Summary Tip Box */}
+            <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-1.5">
+              <h4 className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 font-semibold">
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                Złota zasada inwentaryzacji:
+              </h4>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                Przed każdym wyjściem w teren (np. skanowanie komputerów w oddziale firmy na smartfonie), wyczyść formularz i upewnij się, że masz naładowaną baterię. Po powrocie do stacji nadrzędnej wyeksportuj plik CSV ze smartfona, zaimportuj go na głównym komputerze i natychmiast wykonaj zapasową kopię bazową (plik JSON). Bezpieczeństwo danych to podstawa!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION: HISTORIA ZMIAN */}
+        {activeSection === "changelog" && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-5 rounded-2xl text-white flex flex-col md:flex-row items-center gap-4 border border-indigo-950 shadow-md">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0 shadow-inner">
+                <History className="h-6 w-6" />
+              </div>
+              <div className="space-y-1 text-center md:text-left">
+                <h3 className="text-base font-bold text-slate-100">Karta Ewolucji Systemu i Historia Zmian</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Przejrzysty przegląd zmian wprowadzanych w kolejnych kompilacjach oprogramowania <strong>SCANVENTORY</strong>. Śledź na bieżąco rozwój funkcji inwentaryzacyjnych.
+                </p>
+              </div>
+            </div>
+
+            {/* Timeline Wrapper */}
+            <div className="relative border-l-2 border-indigo-100 ml-4 pl-8 space-y-8 py-4">
+
+              {/* Version 1.2.0 */}
+              <div className="relative">
+                {/* Visual marker on the line */}
+                <div className="absolute -left-[41px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full border-2 border-blue-500 bg-white shadow-xs">
+                  <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">v1.2.0</span>
+                    <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 10 lipca 2026 r. (Aktualne wydanie)
+                    </span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-200 ml-auto">Najnowsza</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Uproszczony Tryb Terenowy i Interaktywny Onboarding</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Dostosowanie architektury pod inwentaryzatorów pracujących w terenie. Wprowadzono automatyczne przełączanie interfejsów w zależności od rozmiaru urządzenia użytkownika.
+                  </p>
+                  <ul className="space-y-1.5 pl-1">
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>Zoptymalizowany widok mobilny:</strong> Automatyczny uproszczony interfejs na smartfonach, blokujący ciężkie panele ewidencji i wyświetlający wyłącznie skaner OCR AI, formularz zapisu oraz szybki eksport baz danych.</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>Interaktywny Przewodnik:</strong> Dodanie podsekcji „Przewodnik użytkownika” dla nowych członków zespołu z systemem interaktywnej checklisty wdrożeniowej (zapamiętywanej lokalnie).</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-150 mt-0.5 shrink-0">ULEPSZENIE</span>
+                      <span>Wzbogacenie meta-sekcji informacyjnych i ulepszenie responsywności pasków bocznych ewidencji na tabletach.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Version 1.1.0 */}
+              <div className="relative">
+                <div className="absolute -left-[41px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full border-2 border-indigo-300 bg-white shadow-xs">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-indigo-600 font-mono bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">v1.1.0</span>
+                    <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 20 czerwca 2026 r.
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Sztuczna Inteligencja OCR i Automatyczne Raportowanie PDF</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Wprowadzenie kluczowej integracji z zaawansowanym modelem językowym w celu przyspieszenia wpisywania sprzętu.
+                  </p>
+                  <ul className="space-y-1.5 pl-1">
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>Silnik Skanera OCR AI:</strong> Integracja z modelem <strong>Gemini-3.5-Flash</strong>. Użytkownicy mogą teraz zrobić zdjęcie naklejki znamionowej aparatem, a AI automatycznie uzupełni specyfikację (procesor, RAM, dysk, model, producenta i numer seryjny).</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>Generator Dokumentów PDF:</strong> Wprowadzenie modułu eksportu raportów inwentaryzacyjnych do formatu PDF o profesjonalnym layoucie biurowym (z podziałami stron, tabelą podsumowującą i polami podpisu).</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-150 mt-0.5 shrink-0">ZMIANA</span>
+                      <span>Przemodelowanie zakładki „Zaawansowane” na nowoczesny kokpit „Usprawnienia i Raporty” ze statystykami i wizualizacjami podziału sprzętu.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Version 1.0.5 */}
+              <div className="relative">
+                <div className="absolute -left-[41px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full border-2 border-slate-300 bg-white shadow-xs">
+                  <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-slate-600 font-mono bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-200">v1.0.5</span>
+                    <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 18 maja 2026 r.
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Menadżer Rotacji Urządzeń i Walidacja Bazy</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Skupiono się na utrzymaniu spójności ewidencji podczas modernizacji stanowisk komputerowych.
+                  </p>
+                  <ul className="space-y-1.5 pl-1">
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>System Rotacji i Wymian:</strong> Nowa sekcja dedykowana powiązaniom między starymi a nowymi urządzeniami. Każde dodawane urządzenie może zastąpić inne w bazie, tworząc historię rotacji stanowiskowej.</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-150 mt-0.5 shrink-0">POPRAWKA</span>
+                      <span><strong>Blokada Duplikatów S/N:</strong> Dodano ostrzeżenia o próbie zarejestrowania sprzętu z numerem seryjnym, który już istnieje w bazie danych.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Version 1.0.0 */}
+              <div className="relative">
+                <div className="absolute -left-[41px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full border-2 border-slate-200 bg-white shadow-xs">
+                  <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 font-mono bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-200">v1.0.0</span>
+                    <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 14 kwietnia 2026 r.
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Pierwsza Stabilna Wersja Produkcyjna (Wydanie Główne)</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Uruchomienie oprogramowania SCANVENTORY. Stabilny silnik lokalnego przechowywania danych z zaawansowanym filtrowaniem i kartami zasobów.
+                  </p>
+                  <ul className="space-y-1.5 pl-1">
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">WBUDOWANE</span>
+                      <span>Lokalna baza danych ewidencji sprzętowej działająca w standardzie offline-first oparta na <strong>LocalStorage</strong>.</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">WBUDOWANE</span>
+                      <span>Możliwość pełnego eksportu i importu danych w formatach pliku <strong>CSV</strong> (kompatybilnym z Excel) oraz kopii zapasowych <strong>JSON</strong>.</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">WBUDOWANE</span>
+                      <span>Inteligentne przeszukiwanie ewidencji według fraz tekstowych oraz filtrowanie po statusie urządzenia, salach i kategoriach sprzętu.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
