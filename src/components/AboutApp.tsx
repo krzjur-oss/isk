@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle, BookOpen, PlusCircle, Camera, FileDown, Sparkles, ArrowRight, CheckSquare, Square, History, Clock, Wifi, WifiOff, Activity, Globe, Copy, Check, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { useToast } from "./Toast";
+import { jsPDF } from "jspdf";
 
 export default function AboutApp() {
-  const { toastWarning } = useToast();
+  const { toastWarning, toastSuccess } = useToast();
   const [activeSection, setActiveSection] = useState<"info" | "guide" | "changelog" | "author" | "terms" | "license">("info");
   const [buildInfo, setBuildInfo] = useState<{ version: string; lastModified: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +30,150 @@ export default function AboutApp() {
       setTimeout(() => setKeyCopySuccess(false), 2000);
     } catch (e) {
       console.error("Failed to copy key to clipboard:", e);
+    }
+  };
+
+  const handleDownloadGuidePDF = () => {
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const sanitize = (text: string): string => {
+        const polishMap: Record<string, string> = {
+          'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+          'Ą': 'A', 'Ć': 'C', 'Ę': 'E', 'Ł': 'L', 'Ń': 'N', 'Ó': 'O', 'Ś': 'S', 'Ź': 'Z', 'Ż': 'Z'
+        };
+        return text.split('').map(char => polishMap[char] || char).join('');
+      };
+
+      // Header Banner
+      doc.setFillColor(30, 41, 59); // Slate-800
+      doc.rect(0, 0, 210, 40, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text(sanitize("PODRECZNIK UZYTKOWNIKA — SCANVENTORY"), 15, 16);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(200, 220, 255);
+      doc.text(sanitize("Kompleksowy poradnik wdrozeniowy dla systemu ewidencji sprzetowej"), 15, 23);
+      doc.text(sanitize("Wersja systemu: v1.3.0 | Status: Aktualna"), 15, 29);
+
+      // Decorative blue line below banner
+      doc.setFillColor(59, 130, 246); // Blue-500
+      doc.rect(0, 40, 210, 2, "F");
+
+      let currentY = 52;
+
+      // Section 1: Intro
+      doc.setTextColor(30, 41, 59);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text(sanitize("1. Opis i cel systemu SCANVENTORY"), 15, currentY);
+      currentY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      const introText = "SCANVENTORY to nowoczesne, wydajne narzedzie przeznaczone do pelnej inwentaryzacji sprzetu komputerowego w szkolach, biurach i instytucjach. Dzieki zastosowaniu technologii sztucznej inteligencji (Gemini 3.5 Flash) i czytnikom kodow QR, system ulatwia zbieranie oraz weryfikacje danych technicznych bezpośrednio z urzadzen.";
+      const splitIntro = doc.splitTextToSize(sanitize(introText), 180);
+      doc.text(splitIntro, 15, currentY);
+      currentY += (splitIntro.length * 4.5) + 6;
+
+      // Section 2: Step 1
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(30, 41, 59);
+      doc.text(sanitize("2. Krok 1: Dodawanie pierwszego sprzetu do ewidencji"), 15, currentY);
+      currentY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      const step1Text = "Kazdy inwentarz zaczyna sie od pierwszego rekordu. Aby dodac urzadzenie recznie, przejdz do sekcji ewidencji i wprowadz podstawowe parametry:\n" +
+        "- Wymagane parametry: Wpisz producenta, model, kategorie (np. laptop, monitor, komputer) oraz stan.\n" +
+        "- Identyfikacja zasobu: Podaj unikalny numer seryjny (S/N) urzadzenia, co zapobiega dublowaniu wpisow.\n" +
+        "- Historia rotacji (Wymiany): Jesli sprzet zastepuje starszy komputer, wybierz stare urzadzenie z listy powiazan w panelu wymian.";
+      const splitStep1 = doc.splitTextToSize(sanitize(step1Text), 180);
+      doc.text(splitStep1, 15, currentY);
+      currentY += (splitStep1.length * 4.5) + 6;
+
+      // Section 3: Step 2
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(30, 41, 59);
+      doc.text(sanitize("3. Krok 2: Automatyczna inwentaryzacja OCR AI"), 15, currentY);
+      currentY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      const step2Text = "Dla zaoszczedzenia czasu mozesz wykorzystac inteligentny Skaner AI (OCR) oparty na modelu Gemini 3.5:\n" +
+        "1. Uruchom aparat na telefonie lub wgraj zdjecie tabliczki znamionowej z dysku.\n" +
+        "2. System przesle obraz do bezpiecznego silnika AI firmy Google.\n" +
+        "3. Model automatycznie rozpozna numer seryjny, producenta, procesor, pamiec RAM, pojemnosc dysku i system operacyjny.\n" +
+        "4. Uzytkownik weryfikuje odczytane pola w formularzu, po czym zapisuje obiekt jednym kliknieciem.";
+      const splitStep2 = doc.splitTextToSize(sanitize(step2Text), 180);
+      doc.text(splitStep2, 15, currentY);
+      currentY += (splitStep2.length * 4.5) + 6;
+
+      // Section 4: Step 3
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(30, 41, 59);
+      doc.text(sanitize("4. Krok 3: Analiza i Raportowanie PDF"), 15, currentY);
+      currentY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      const step3Text = "Dzieki zebranym danym mozesz generowac pelne i profesjonalne zestawienia w formacie PDF gotowym do wydruku:\n" +
+        "- Przejdz do zakladki 'Usprawnienia i Raporty'.\n" +
+        "- Kliknij 'Generuj raport PDF' — system skompiluje estetyczny plik z danymi tabelarycznymi, statystykami ilosciowymi oraz miejscem na podpisy.\n" +
+        "- Pamietaj tez o regularnym eksportowaniu kopii bezpieczenstwa do plikow CSV lub JSON.";
+      const splitStep3 = doc.splitTextToSize(sanitize(step3Text), 180);
+      doc.text(splitStep3, 15, currentY);
+      currentY += (splitStep3.length * 4.5) + 6;
+
+      // Section 5: Limits FAQ
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(30, 41, 59);
+      doc.text(sanitize("5. Limity zapytań i Bezpieczeństwo"), 15, currentY);
+      currentY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      const step4Text = "Darmowe limity zapytan w Google AI Studio wynosza 1500 zapytan na dobe (oraz 15 na minute). W sekcji informacyjnej mozesz skonfigurowac wlasny prog ostrzezen, aby kontrolowac zuzycie darmowego limitu. Twoje dane oraz klucze API sa w pelni bezpieczne, zapisywane wylacznie lokalnie in pamieci przegladarki.";
+      const splitStep4 = doc.splitTextToSize(sanitize(step4Text), 180);
+      doc.text(splitStep4, 15, currentY);
+      currentY += (splitStep4.length * 4.5) + 10;
+
+      // Footer
+      doc.setDrawColor(220, 225, 230);
+      doc.line(15, currentY, 195, currentY);
+      currentY += 5;
+
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(sanitize("SCANVENTORY — Inteligentna ewidencja sprzetowa IT. Wszelkie prawa zastrzezone."), 15, currentY);
+
+      doc.save("SCANVENTORY_Podrecznik_Uzytkownika.pdf");
+      if (toastSuccess) {
+        toastSuccess("Pomyślnie wygenerowano i pobrano podręcznik użytkownika PDF!");
+      }
+    } catch (e: any) {
+      console.error(e);
+      if (toastWarning) {
+        toastWarning("Błąd generowania podręcznika PDF: " + e.message);
+      }
     }
   };
 
@@ -679,16 +824,26 @@ export default function AboutApp() {
         {/* SECTION: PRZEWODNIK UŻYTKOWNIKA */}
         {activeSection === "guide" && (
           <div className="space-y-6 animate-in fade-in duration-150">
-            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 p-5 rounded-2xl border border-blue-150 flex flex-col md:flex-row items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-md">
-                <BookOpen className="h-6 w-6" />
+            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 p-5 rounded-2xl border border-blue-150 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-md">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div className="space-y-1 text-center md:text-left">
+                  <h3 className="text-base font-bold text-slate-900">Podręcznik wdrożeniowy dla nowego członka zespołu</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Witaj w zespole administratorów <strong>SCANVENTORY</strong>! Przeczytaj poniższy przewodnik krok po kroku, aby sprawnie poznać podstawowe funkcjonalności systemu i natychmiast rozpocząć inwentaryzację.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1 text-center md:text-left">
-                <h3 className="text-base font-bold text-slate-900">Podręcznik wdrożeniowy dla nowego członka zespołu</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Witaj w zespole administratorów <strong>SCANVENTORY</strong>! Przeczytaj poniższy przewodnik krok po kroku, aby sprawnie poznać podstawowe funkcjonalności systemu i natychmiast rozpocząć inwentaryzację.
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={handleDownloadGuidePDF}
+                className="w-full md:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg shrink-0 cursor-pointer"
+              >
+                <FileDown className="h-4 w-4" />
+                Pobierz podręcznik (PDF)
+              </button>
             </div>
 
             {/* Steps Container */}
