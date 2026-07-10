@@ -164,12 +164,12 @@ Zwr\xF3\u0107 dane w formacie JSON pasuj\u0105cym do tego schematu. Nie dodawaj 
       const finalTime = maxMtime > 0 ? new Date(maxMtime) : /* @__PURE__ */ new Date();
       res.json({
         lastModified: finalTime.toISOString(),
-        version: "1.2.0"
+        version: "1.3.0"
       });
     } catch (error) {
       res.json({
         lastModified: (/* @__PURE__ */ new Date()).toISOString(),
-        version: "1.2.0"
+        version: "1.3.0"
       });
     }
   });
