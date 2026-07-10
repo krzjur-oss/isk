@@ -3,6 +3,7 @@ import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
 import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar, Database, QrCode, Printer, Download, Copy, Check, X } from "lucide-react";
 import { generateInventoryPDF } from "../utils/pdfGenerator";
 import QRCode from "qrcode";
+import { useToast } from "./Toast";
 
 // Helper map to map CSV headers to InventoryItem keys (case-insensitive and Polish-compatible)
 const headerMapping: Record<string, keyof InventoryItem> = {
@@ -137,13 +138,18 @@ interface HardwareListProps {
   items: InventoryItem[];
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
+  onUpdateItems?: (items: InventoryItem[]) => void;
 }
 
-export default function HardwareList({ items, onEdit, onDelete }: HardwareListProps) {
+export default function HardwareList({ items, onEdit, onDelete, onUpdateItems }: HardwareListProps) {
+  const { toastSuccess, toastWarning, toastError } = useToast();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [onlyOver3Years, setOnlyOver3Years] = useState(false);
+
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // QR Code states
   const [qrItem, setQrItem] = useState<InventoryItem | null>(null);
@@ -157,13 +163,22 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
       return;
     }
     
+    let cSettings = null;
+    try {
+      const stored = localStorage.getItem("scanventory_company_settings");
+      if (stored) cSettings = JSON.parse(stored);
+    } catch (_) {}
+
     let text = "";
     if (qrContentType === "standard") {
-      text = `SKANWENTARZ IT\nID: ${qrItem.id}\nSprzęt: ${qrItem.manufacturer} ${qrItem.model}\nS/N: ${qrItem.serialNumber || 'brak'}\nKategoria: ${qrItem.category}\nSala: ${qrItem.room || 'brak'}`;
+      const title = cSettings?.companyName || "SKANWENTARZ IT";
+      const deptText = cSettings?.department ? `\nDział: ${cSettings.department}` : "";
+      const prefixText = cSettings?.inventoryPrefix ? `\nInwentarz: ${cSettings.inventoryPrefix}${qrItem.id}` : `\nID: ${qrItem.id}`;
+      text = `${title}${deptText}\nSprzęt: ${qrItem.manufacturer} ${qrItem.model}\nS/N: ${qrItem.serialNumber || 'brak'}\nKategoria: ${qrItem.category}\nSala: ${qrItem.room || 'brak'}${prefixText}`;
     } else if (qrContentType === "sn") {
       text = qrItem.serialNumber || qrItem.id;
     } else if (qrContentType === "id") {
-      text = qrItem.id;
+      text = cSettings?.inventoryPrefix ? `${cSettings.inventoryPrefix}${qrItem.id}` : qrItem.id;
     }
     
     QRCode.toDataURL(text, {
@@ -184,13 +199,23 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
 
   const handleCopyText = () => {
     if (!qrItem) return;
+    
+    let cSettings = null;
+    try {
+      const stored = localStorage.getItem("scanventory_company_settings");
+      if (stored) cSettings = JSON.parse(stored);
+    } catch (_) {}
+
     let text = "";
     if (qrContentType === "standard") {
-      text = `SKANWENTARZ IT\nID: ${qrItem.id}\nSprzęt: ${qrItem.manufacturer} ${qrItem.model}\nS/N: ${qrItem.serialNumber || 'brak'}\nKategoria: ${qrItem.category}\nSala: ${qrItem.room || 'brak'}`;
+      const title = cSettings?.companyName || "SKANWENTARZ IT";
+      const deptText = cSettings?.department ? `\nDział: ${cSettings.department}` : "";
+      const prefixText = cSettings?.inventoryPrefix ? `\nInwentarz: ${cSettings.inventoryPrefix}${qrItem.id}` : `\nID: ${qrItem.id}`;
+      text = `${title}${deptText}\nSprzęt: ${qrItem.manufacturer} ${qrItem.model}\nS/N: ${qrItem.serialNumber || 'brak'}\nKategoria: ${qrItem.category}\nSala: ${qrItem.room || 'brak'}${prefixText}`;
     } else if (qrContentType === "sn") {
       text = qrItem.serialNumber || qrItem.id;
     } else if (qrContentType === "id") {
-      text = qrItem.id;
+      text = cSettings?.inventoryPrefix ? `${cSettings.inventoryPrefix}${qrItem.id}` : qrItem.id;
     }
     
     navigator.clipboard.writeText(text)
@@ -215,6 +240,17 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
 
   const handlePrintLabel = () => {
     if (!qrItem || !qrCodeUrl) return;
+    
+    let cSettings = null;
+    try {
+      const stored = localStorage.getItem("scanventory_company_settings");
+      if (stored) cSettings = JSON.parse(stored);
+    } catch (_) {}
+
+    const title = cSettings?.companyName || "SKANWENTARZ IT";
+    const deptLine = cSettings?.department ? `<div><span class="bold">Dział:</span> ${cSettings.department}</div>` : "";
+    const prefixText = cSettings?.inventoryPrefix ? `${cSettings.inventoryPrefix}${qrItem.id}` : qrItem.id;
+    const prefixLabel = cSettings?.inventoryPrefix ? "Inwentarz" : "ID";
     
     const printWindow = window.open("", "_blank", "width=600,height=400");
     if (!printWindow) {
@@ -274,6 +310,7 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
               margin-bottom: 2px;
               border-bottom: 1px solid #cbd5e1;
               padding-bottom: 3px;
+              text-transform: uppercase;
             }
             .bold {
               font-weight: bold;
@@ -311,12 +348,13 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
               <img class="qr-img" src="${qrCodeUrl}" />
             </div>
             <div class="details">
-              <div class="title">SKANWENTARZ IT</div>
+              <div class="title">${title}</div>
+              ${deptLine}
               <div><span class="bold">Sprzęt:</span> ${qrItem.manufacturer} ${qrItem.model}</div>
               <div><span class="bold">S/N:</span> <span class="tag">${qrItem.serialNumber || 'brak'}</span></div>
               <div><span class="bold">Kategoria:</span> ${qrItem.category}</div>
               <div><span class="bold">Sala:</span> ${qrItem.room || 'brak'}</div>
-              <div class="footer">ID: ${qrItem.id}</div>
+              <div class="footer">${prefixLabel}: ${prefixText}</div>
             </div>
           </div>
           <script>
@@ -352,6 +390,58 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
 
     return matchesSearch && matchesCategory && matchesStatus && matchesOver3Years;
   });
+
+  // Selection handlers
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(itemId => itemId !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleAll = () => {
+    const filteredIds = filteredItems.map(item => item.id);
+    const allFilteredAreSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.includes(id));
+
+    if (allFilteredAreSelected) {
+      setSelectedIds(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      setSelectedIds(prev => {
+        const combined = [...prev, ...filteredIds];
+        return combined.filter((val, idx, arr) => arr.indexOf(val) === idx);
+      });
+    }
+  };
+
+  const handleBulkStatusToRetired = () => {
+    if (!onUpdateItems) {
+      toastError("Brak funkcji zapisu zmian w bazie.");
+      return;
+    }
+    if (selectedIds.length === 0) return;
+
+    if (confirm(`Czy na pewno chcesz zmienić status dla ${selectedIds.length} zaznaczonych urządzeń na 'Wycofany'?`)) {
+      const updatedItems = items.map(item => {
+        if (selectedIds.includes(item.id)) {
+          return {
+            ...item,
+            status: "Wycofany" as HardwareStatus,
+            lastModifiedAt: new Date().toISOString().split("T")[0]
+          };
+        }
+        return item;
+      });
+      onUpdateItems(updatedItems);
+      toastSuccess(`Pomyślnie wycofano ${selectedIds.length} urządzeń!`);
+      setSelectedIds([]);
+    }
+  };
+
+  const handleBulkExportPDF = () => {
+    if (selectedIds.length === 0) return;
+    const selectedItems = items.filter(item => selectedIds.includes(item.id));
+    generateInventoryPDF(selectedItems, "Raport Wybranych Urzadzen Komputerowych");
+    toastSuccess(`Wygenerowano raport PDF dla ${selectedIds.length} wybranych urządzeń!`);
+  };
 
   const over3YearsItemsCount = items.filter(item => {
     if (item.status !== "W użyciu") return false;
@@ -466,6 +556,47 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
         </div>
       )}
 
+      {/* Zbiorcze akcje (Bulk actions) banner */}
+      {selectedIds.length > 0 && (
+        <div className="mx-4 mt-4 p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-200">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-600 text-white text-xs font-extrabold shadow-sm shrink-0">
+              {selectedIds.length}
+            </div>
+            <div className="text-left">
+              <h4 className="text-xs font-extrabold text-blue-900">Zaznaczono urządzenia ({selectedIds.length})</h4>
+              <p className="text-[10.5px] text-blue-700/90 mt-0.5">Możesz zmienić ich status na wycofany lub wygenerować dla nich osobny raport PDF.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              onClick={handleBulkStatusToRetired}
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[11px] rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Oznacz jako: Wycofany
+            </button>
+            
+            <button
+              onClick={handleBulkExportPDF}
+              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-[11px] rounded-lg shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              Pobierz PDF ({selectedIds.length})
+            </button>
+
+            <button
+              onClick={() => setSelectedIds([])}
+              className="p-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              title="Anuluj zaznaczenie"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main List Table */}
       <div className="overflow-x-auto">
         {filteredItems.length === 0 ? (
@@ -478,6 +609,14 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="bg-slate-50/30 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                <th className="py-3.5 px-4 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                    checked={filteredItems.length > 0 && filteredItems.every(item => selectedIds.includes(item.id))}
+                    onChange={handleToggleAll}
+                  />
+                </th>
                 <th className="py-3.5 px-4 w-12">Podgląd</th>
                 <th className="py-3.5 px-4">Urządzenie</th>
                 <th className="py-3.5 px-4">Numer seryjny (S/N)</th>
@@ -506,7 +645,17 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
                 }
 
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors ${selectedIds.includes(item.id) ? "bg-blue-50/20" : ""}`}>
+                    {/* Checkbox column */}
+                    <td className="py-3 px-4 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => handleToggleSelect(item.id)}
+                      />
+                    </td>
+
                     {/* Thumbnail / Icon column */}
                     <td className="py-3 px-4">
                       {item.photoUrl ? (
@@ -736,9 +885,36 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
                 {/* Detail Section */}
                 <div className="flex-1 text-xs text-slate-600 space-y-1.5 w-full">
                   <div className="font-extrabold text-sm text-slate-900 border-b border-slate-100 pb-1 flex items-center justify-between">
-                    <span>SKANWENTARZ IT</span>
+                    <span className="uppercase truncate max-w-[150px]">
+                      {(() => {
+                        try {
+                          const stored = localStorage.getItem("scanventory_company_settings");
+                          if (stored) {
+                            return JSON.parse(stored).companyName || "SKANWENTARZ IT";
+                          }
+                        } catch (_) {}
+                        return "SKANWENTARZ IT";
+                      })()}
+                    </span>
                     <span className="text-[9px] bg-slate-100 text-slate-500 font-mono px-1 rounded uppercase">Etykieta</span>
                   </div>
+                  {(() => {
+                    try {
+                      const stored = localStorage.getItem("scanventory_company_settings");
+                      if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.department) {
+                          return (
+                            <div>
+                              <span className="font-bold text-slate-500">Dział: </span>
+                              <span className="text-slate-800 font-semibold">{parsed.department}</span>
+                            </div>
+                          );
+                        }
+                      }
+                    } catch (_) {}
+                    return null;
+                  })()}
                   <div>
                     <span className="font-bold text-slate-500">Sprzęt: </span>
                     <span className="text-slate-800 font-semibold">{qrItem.manufacturer} {qrItem.model}</span>
@@ -758,7 +934,18 @@ export default function HardwareList({ items, onEdit, onDelete }: HardwareListPr
                     </div>
                   )}
                   <div className="text-[10px] text-slate-400 font-mono pt-1">
-                    ID: {qrItem.id}
+                    {(() => {
+                      try {
+                        const stored = localStorage.getItem("scanventory_company_settings");
+                        if (stored) {
+                          const parsed = JSON.parse(stored);
+                          if (parsed.inventoryPrefix) {
+                            return `Inwentarz: ${parsed.inventoryPrefix}${qrItem.id}`;
+                          }
+                        }
+                      } catch (_) {}
+                      return `ID: ${qrItem.id}`;
+                    })()}
                   </div>
                 </div>
               </div>

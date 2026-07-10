@@ -10,6 +10,7 @@ export default function AboutApp() {
     step2: false,
     step3: false,
   });
+  const [ocrCallsCount, setOcrCallsCount] = useState(0);
 
   useEffect(() => {
     // Load checklist from localStorage for interactive onboarding feel
@@ -21,7 +22,28 @@ export default function AboutApp() {
     } catch (e) {
       console.error(e);
     }
+
+    // Load OCR calls count
+    try {
+      const stored = localStorage.getItem("scanventory_gemini_ocr_calls");
+      if (stored) {
+        setOcrCallsCount(parseInt(stored, 10));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
+
+  const handleResetOcrCounter = () => {
+    if (confirm("Czy na pewno chcesz zresetować lokalny licznik operacji OCR?")) {
+      try {
+        localStorage.setItem("scanventory_gemini_ocr_calls", "0");
+        setOcrCallsCount(0);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
   const toggleStep = (stepId: string) => {
     const updated = { ...completedSteps, [stepId]: !completedSteps[stepId] };
@@ -206,6 +228,130 @@ export default function AboutApp() {
                     <span className="text-emerald-600 font-bold flex items-center gap-0.5">Kompatybilny</span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Gemini API Free Quota Tracker */}
+            <div className="p-5 bg-indigo-50/30 rounded-xl border border-indigo-100/80 space-y-4">
+              <div className="flex gap-4 items-start">
+                <div className="p-2.5 bg-indigo-100/60 rounded-xl text-indigo-600 shrink-0 shadow-xs">
+                  <Sparkles className="h-5.5 w-5.5 animate-pulse" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-sm font-bold text-slate-800">Monitor Darmowego Limitu Gemini API</h4>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-100/60 px-2 py-0.5 rounded-md">
+                      AI Studio Free Tier
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Każdy darmowy klucz API wygenerowany w Google AI Studio posiada bezpłatny limit wynoszący <strong>1500 zapytań na dobę</strong> (oraz do 15 zapytań na minutę). Poniższy pasek postępu szacuje dzienne zużycie na podstawie udanych operacji OCR AI zarejestrowanych w tej przeglądarce.
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Bar Container */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                  <span>Wykorzystany limit dobowy</span>
+                  <span className={`${ocrCallsCount > 1200 ? "text-rose-600" : ocrCallsCount > 750 ? "text-amber-600" : "text-blue-600"}`}>
+                    {ocrCallsCount} / 1500 ({Math.min(100, (ocrCallsCount / 1500) * 100).toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200/50 p-0.5">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      ocrCallsCount > 1200 
+                        ? "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" 
+                        : ocrCallsCount > 750 
+                          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" 
+                          : "bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
+                    }`}
+                    style={{ width: `${Math.min(100, (ocrCallsCount / 1500) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[9px] text-slate-400 font-bold px-0.5">
+                  <span>0 (Start)</span>
+                  <span>750 (50%)</span>
+                  <span>1500 (Darmowy limit dobowy)</span>
+                </div>
+              </div>
+
+              {/* Mini Stats and Action Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div className="p-2.5 bg-white rounded-lg border border-slate-150 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Wykonane skany AI:</span>
+                  <span className="text-base font-extrabold text-slate-700 mt-0.5">{ocrCallsCount}</span>
+                </div>
+                <div className="p-2.5 bg-white rounded-lg border border-slate-150 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Szacunkowo pozostało:</span>
+                  <span className="text-base font-extrabold text-slate-700 mt-0.5">{Math.max(0, 1500 - ocrCallsCount)}</span>
+                </div>
+                <div className="p-2.5 bg-white rounded-lg border border-slate-150 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Akcja:</span>
+                  <button
+                    onClick={handleResetOcrCounter}
+                    className="text-[10px] font-bold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer text-left self-start mt-1.5 flex items-center gap-1 hover:underline"
+                  >
+                    Resetuj licznik ↺
+                  </button>
+                </div>
+              </div>
+
+              {/* Step-by-step Guide to Get Key */}
+              <div className="bg-white/60 rounded-xl p-4 border border-indigo-100/50 space-y-3">
+                <div className="flex items-center gap-2 text-indigo-950 font-bold text-xs pb-1 border-b border-indigo-100/45">
+                  <HelpCircle className="h-4 w-4 text-indigo-500 shrink-0" />
+                  <span>Szybki poradnik: Jak uzyskać bezpłatny klucz Gemini API?</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[10.5px] text-slate-600 leading-relaxed">
+                  <div className="space-y-2">
+                    <div className="flex gap-2 items-start">
+                      <span className="flex items-center justify-center h-4.5 w-4.5 bg-indigo-150 text-indigo-700 rounded-full font-extrabold text-[9px] shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <div>
+                        Otwórz platformę deweloperską <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline inline-flex items-center gap-0.5 font-bold">
+                          Google AI Studio <ExternalLink className="h-3 w-3" />
+                        </a> i zaloguj się swoim kontem Google.
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 items-start">
+                      <span className="flex items-center justify-center h-4.5 w-4.5 bg-indigo-150 text-indigo-700 rounded-full font-extrabold text-[9px] shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <div>
+                        W lewym górnym rogu ekranu (lub na pasku bocznym) kliknij wyróżniony, niebieski przycisk <strong>„Get API key”</strong> (Pobierz klucz API).
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex gap-2 items-start">
+                      <span className="flex items-center justify-center h-4.5 w-4.5 bg-indigo-150 text-indigo-700 rounded-full font-extrabold text-[9px] shrink-0 mt-0.5">
+                        3
+                      </span>
+                      <div>
+                        Kliknij przycisk <strong>„Create API key”</strong>, zaakceptuj regulamin usługi darmowej i skopiuj nowo wygenerowany ciąg znaków klucza.
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 items-start">
+                      <span className="flex items-center justify-center h-4.5 w-4.5 bg-indigo-150 text-indigo-700 rounded-full font-extrabold text-[9px] shrink-0 mt-0.5">
+                        4
+                      </span>
+                      <div>
+                        Wprowadź klucz w ustawieniach środowiskowych tej aplikacji jako zmienną <code>GEMINI_API_KEY</code> (sekcja <strong>Settings</strong> w panelu bocznym AI Studio Build).
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[9.5px] text-slate-400 leading-normal italic bg-white/45 p-2 rounded-md border border-slate-100">
+                * Rzeczywisty darmowy limit odnawia się automatycznie w Google AI Studio. Licznik ma charakter wyłącznie orientacyjny dla celów testowych i weryfikacji liczby zapytań z bieżącej przeglądarki.
               </div>
             </div>
 
@@ -574,10 +720,20 @@ export default function AboutApp() {
 
               <div>
                 <h4 className="font-bold text-slate-800 mb-1">§4 Ochrona prywatności i AI</h4>
-                <p>
-                  Funkcja automatycznego odczytu specyfikacji z naklejek (OCR) przetwarza jedynie przesyłane zdjęcia tabliczek znamionowych w celu ekstrakcji parametrów technicznych. 
-                  Zdjęcia te nie są trwale archiwizowane ani wykorzystywane do celów marketingowych.
-                </p>
+                <div className="space-y-2">
+                  <p>
+                    Funkcja automatycznego odczytu specyfikacji z naklejek (OCR) przetwarza jedynie przesyłane zdjęcia tabliczek znamionowych w celu ekstrakcji parametrów technicznych przy użyciu technologii sztucznej inteligencji. 
+                  </p>
+                  <p>
+                    <strong>Bezpieczeństwo kluczy API:</strong> W darmowym „Trybie Bezpośrednim (Client-Side)”, Twój klucz Gemini API podawany w ustawieniach formularza jest przechowywany bezpiecznie wyłącznie w lokalnej pamięci Twojej przeglądarki (<span className="font-mono">localStorage</span>). Zapytania i zdjęcia są przekazywane bezpośrednio z Twojego urządzenia do oficjalnych i bezpiecznych serwerów Google (Google AI Studio) przy użyciu szyfrowanego połączenia HTTPS. Nie uczestniczą w tym żadne serwery pośredniczące.
+                  </p>
+                  <p>
+                    <strong>Przetwarzanie zdjęć:</strong> Zdjęcia robione aparatem lub wgrywane z dysku są przesyłane jako dane binarne wyłącznie w celu odczytu parametrów i natychmiast po zwróceniu wyniku OCR przez AI są usuwane z pamięci podręcznej aplikacji. SCANVENTORY nie archiwizuje Twoich zdjęć na żadnych zewnętrznych hostingach.
+                  </p>
+                  <p>
+                    <strong>Regulacje Google AI:</strong> Korzystając z bezpłatnego klucza API, przesyłane dane podlegają postanowieniom dotyczącym polityki prywatności platformy Google AI Studio. Aby uniknąć naruszeń prywatności, surowo zabrania się skanowania dokumentów zawierających dane osobowe, dowody tożsamości lub poufne dane firmowe – program przeznaczony jest wyłącznie do skanowania oznaczeń fabrycznych sprzętu IT.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

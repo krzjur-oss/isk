@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Camera, Upload, AlertCircle, Loader2, Sparkles, Check, RefreshCw, Undo, QrCode, Search, FileUp, X, Info } from "lucide-react";
+import { Camera, Upload, AlertCircle, Loader2, Sparkles, Check, RefreshCw, Undo, QrCode, Search, FileUp, X, Info, Key } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 
 interface HardwareFormProps {
@@ -64,6 +64,31 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items,
     matchedItem: InventoryItem | null;
   } | null>(null);
   const [qrDragActive, setQrDragActive] = useState(false);
+
+  // Client-Side Gemini API key states
+  const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem("scanventory_user_gemini_api_key") || "");
+  const [tempKey, setTempKey] = useState(() => localStorage.getItem("scanventory_user_gemini_api_key") || "");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+
+  const saveApiKey = () => {
+    const trimmed = tempKey.trim();
+    if (trimmed) {
+      localStorage.setItem("scanventory_user_gemini_api_key", trimmed);
+      setCustomApiKey(trimmed);
+      setTempKey(trimmed);
+      setApiError("");
+      setShowKeyInput(false);
+    } else {
+      clearApiKey();
+    }
+  };
+
+  const clearApiKey = () => {
+    localStorage.removeItem("scanventory_user_gemini_api_key");
+    setCustomApiKey("");
+    setTempKey("");
+    setShowKeyInput(false);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -363,9 +388,153 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items,
     }
   };
 
+  const analyzeImageDirectly = async (base64Image: string, apiKey: string) => {
+    const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+    let mimeType = "image/jpeg";
+    let base64Data = base64Image;
+
+    if (matches) {
+      mimeType = matches[1];
+      base64Data = matches[2];
+    }
+
+    const systemInstruction = `Jesteś ekspertem ds. inwentaryzacji sprzętu IT oraz profesjonalnym czytnikiem OCR. Twoim zadaniem jest analiza zdjęć naklejek znamionowych, tyłu urządzeń, kodów kreskowych lub samych urządzeń komputerowych w celu dokładnego rozpoznania danych technicznych.
+Zwróć wynik jako czysty JSON pasujący do określonego schematu. Pola nie powinny być puste, jeśli jesteś w stanie je wywnioskować lub odczytać z obrazka. Przeprowadź dokładne OCR dla numeru seryjnego (S/N) i producenta.`;
+
+    const prompt = `Zanalizuj to zdjęcie sprzętu komputerowego lub jego tabliczki znamionowej.
+Zidentyfikuj szczegóły sprzętu.
+Zwróć szczegółowy obiekt JSON o następujących polach:
+- manufacturer: Producent (np. HP, Dell, Lenovo, Apple, Asus, Acer itp.)
+- model: Dokładna nazwa modelu (np. Latitude 5420, ThinkPad T14, MacBook Pro 14)
+- serialNumber: Numer seryjny komputera (S/N, Service Tag, Serial No). Wyciągnij go bez spacji, dokładnie tak jak jest na naklejce.
+- processor: Model procesora (np. Intel Core i5-1145G7, AMD Ryzen 5 5600U, Apple M2)
+- ram: Pojemność pamięci RAM (np. 16 GB, 8 GB)
+- storage: Pojemność i typ dysku (np. 512 GB SSD, 1 TB HDD, 256 GB NVMe)
+- graphics: Karta graficzna (np. Intel Iris Xe, Nvidia RTX 3050, Apple GPU)
+- operatingSystem: System operacyjny (np. Windows 11 Pro, macOS Sonoma, Windows 10 Home)
+- category: Jedna z wartości: "Laptop", "Komputer Stacjonarny", "Serwer", "Monitor", "Inny".
+- confidence: Szacowana procentowa pewność odczytu danych OCR (liczba całkowita od 0 do 100).
+- notes: Wszelkie inne przydatne informacje z naklejki, np. adres MAC (MAC ID), Express Service Code, data produkcji, parametry zasilania, wersja BIOS, ID klienta itp.`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data
+                }
+              },
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        systemInstruction: {
+          parts: [
+            {
+              text: systemInstruction
+            }
+          ]
+        },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              manufacturer: { type: "STRING" },
+              model: { type: "STRING" },
+              serialNumber: { type: "STRING" },
+              processor: { type: "STRING" },
+              ram: { type: "STRING" },
+              storage: { type: "STRING" },
+              graphics: { type: "STRING" },
+              operatingSystem: { type: "STRING" },
+              category: { type: "STRING" },
+              confidence: { type: "INTEGER" },
+              notes: { type: "STRING" },
+            },
+            required: ["manufacturer", "model", "serialNumber", "category", "confidence"],
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let errMsg = "Błąd bezpośredniego połączenia z Gemini API.";
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg = errJson.error?.message || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const result = await response.json();
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) {
+      throw new Error("Pusta odpowiedź z modelu Gemini API.");
+    }
+
+    const trimmed = responseText.trim();
+    const matchesJson = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    const cleanJson = matchesJson ? matchesJson[1] : trimmed;
+    return JSON.parse(cleanJson);
+  };
+
   const analyzeImage = async (base64Image: string) => {
     setIsAnalyzing(true);
     setApiError("");
+
+    const activeKey = localStorage.getItem("scanventory_user_gemini_api_key") || customApiKey;
+
+    if (activeKey && activeKey.trim()) {
+      try {
+        const data = await analyzeImageDirectly(base64Image, activeKey.trim());
+        
+        // Auto-fill form fields from Gemini response
+        setManufacturer(data.manufacturer || "");
+        setModel(data.model || "");
+        setSerialNumber(data.serialNumber || "");
+        setProcessor(data.processor || "");
+        setRam(data.ram || "");
+        setStorage(data.storage || "");
+        setGraphics(data.graphics || "");
+        setOperatingSystem(data.operatingSystem || "");
+        if (["Laptop", "Komputer Stacjonarny", "Serwer", "Monitor", "Inny"].includes(data.category)) {
+          setCategory(data.category as HardwareCategory);
+        }
+        setConfidence(data.confidence || 85);
+        
+        const newNotes = data.notes 
+          ? `[Bezpośredni odczyt AI - Pewność: ${data.confidence}%]\n${data.notes}`
+          : `[Bezpośredni odczyt AI - Pewność: ${data.confidence}%]`;
+        setNotes(newNotes);
+        setOcrSuccess(true);
+        try {
+          const currentCount = parseInt(localStorage.getItem("scanventory_gemini_ocr_calls") || "0", 10);
+          localStorage.setItem("scanventory_gemini_ocr_calls", (currentCount + 1).toString());
+        } catch (e) {
+          console.error("Failed to update OCR calls counter:", e);
+        }
+        return;
+      } catch (err: any) {
+        console.error("Direct Gemini API error:", err);
+        setApiError(`Błąd bezpośredniego połączenia z Gemini API: ${err.message || "Upewnij się, że Twój klucz jest prawidłowy i ma włączony dostęp do modeli Gemini."}`);
+        setIsAnalyzing(false);
+        return;
+      }
+    }
 
     try {
       const response = await fetch("/api/ocr", {
@@ -387,7 +556,8 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items,
             const errData = await response.json();
             errMsg = errData.error || errMsg;
           } else {
-            errMsg = `Błąd połączenia (Status ${response.status}). Funkcja automatycznego odczytu OCR wymaga uruchomionego serwera backendu (np. na Render/Heroku/Cloud Run). Możesz nadal wpisać dane ręcznie.`;
+            errMsg = `Błąd połączenia (Status ${response.status}). Funkcja automatycznego odczytu OCR wymaga uruchomionego serwera backendu. Możesz aktywować BEZPŁATNY, niezależny Tryb Bezpośredni (Client-Side) podając darmowy klucz Gemini API poniżej!`;
+            setShowKeyInput(true);
           }
         } catch (_) {}
         throw new Error(errMsg);
@@ -414,9 +584,20 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items,
         : `[Automatyczny odczyt OCR - Pewność: ${data.confidence}%]`;
       setNotes(newNotes);
       setOcrSuccess(true);
+      try {
+        const currentCount = parseInt(localStorage.getItem("scanventory_gemini_ocr_calls") || "0", 10);
+        localStorage.setItem("scanventory_gemini_ocr_calls", (currentCount + 1).toString());
+      } catch (e) {
+        console.error("Failed to update OCR calls counter:", e);
+      }
     } catch (err: any) {
       console.error(err);
-      setApiError(err.message || "Wystąpił problem z połączeniem z modułem AI OCR. Spróbuj ponownie lub uzupełnij pola ręcznie.");
+      let fallbackText = err.message || "Wystąpił problem z połączeniem z modułem AI OCR.";
+      if (fallbackText.includes("Failed to fetch") || fallbackText.includes("NetworkError") || fallbackText.includes("Status 404") || fallbackText.includes("Status 405")) {
+        fallbackText = `Błąd połączenia z serwerem. Aby skanowanie działało u każdego za darmo (bez potrzeby uruchamiania serwera backendu), aktywuj "Bezpłatny tryb bezpośredni (Client-Side AI)" podając darmowy klucz Gemini API w panelu poniżej!`;
+        setShowKeyInput(true);
+      }
+      setApiError(fallbackText);
     } finally {
       setIsAnalyzing(false);
     }
@@ -737,6 +918,80 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items,
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Client-Side Direct Gemini API Key Settings */}
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyInput(!showKeyInput)}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Key className="h-3.5 w-3.5" />
+                    {customApiKey ? "🔑 Bezpłatny tryb bezpośredni: Włączony" : "🔑 Skonfiguruj darmowe AI (Tryb bez serwera)"}
+                  </button>
+                  {customApiKey && (
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">
+                      Bez serwera
+                    </span>
+                  )}
+                </div>
+
+                {showKeyInput && (
+                  <div className="mt-2.5 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5 text-left animate-in slide-in-from-top-2 duration-200">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">Ustawienia Bezpłatnego Trybu Bezpośredniego</h4>
+                      <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
+                        Pozwala na korzystanie z automatycznego skanera całkowicie za darmo i bezpośrednio z przeglądarki (nawet na GitHub Pages!). Wystarczy wkleić bezpłatny klucz API z Google AI Studio.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Twój klucz Gemini API:</label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="password"
+                          value={tempKey}
+                          onChange={(e) => setTempKey(e.target.value)}
+                          placeholder="AIzaSy..."
+                          className="flex-1 text-xs font-mono p-1.5 bg-white border border-slate-200 rounded focus:border-indigo-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={saveApiKey}
+                          className="px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded cursor-pointer transition-colors"
+                        >
+                          Zapisz
+                        </button>
+                        {customApiKey && (
+                          <button
+                            type="button"
+                            onClick={clearApiKey}
+                            className="px-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded cursor-pointer transition-colors"
+                            title="Usuń klucz i wróć do trybu serwera"
+                          >
+                            Usuń
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 text-[10px]">
+                      <a
+                        href="https://aistudio.google.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:underline font-semibold flex items-center gap-1"
+                      >
+                        ⚡ Pobierz darmowy klucz z Google AI Studio (30 sekund) ↗
+                      </a>
+                      <p className="text-slate-400 text-[9px]">
+                        Twój klucz jest zapisywany wyłącznie w pamięci Twojej przeglądarki i nigdy nie jest wysyłany do żadnych innych serwerów pośredniczących.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -6,8 +6,11 @@ import HardwareList from "./components/HardwareList";
 import ReplacementManager from "./components/ReplacementManager";
 import AboutApp from "./components/AboutApp";
 import AdvancedFeatures from "./components/AdvancedFeatures";
-import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle, Smartphone, FileSpreadsheet, Upload, FileDown, BookOpen } from "lucide-react";
+import CompanySettings from "./components/CompanySettings";
+import MobileQrScanner from "./components/MobileQrScanner";
+import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle, Smartphone, FileSpreadsheet, Upload, FileDown, BookOpen, Building2 } from "lucide-react";
 import { ToastProvider, useToast } from "./components/Toast";
+import ConsentModal from "./components/ConsentModal";
 
 const LOCAL_STORAGE_KEY = "it_inventory_items_v1";
 
@@ -119,10 +122,21 @@ export default function App() {
 function AppContent() {
   const { toastSuccess, toastError, toastInfo, toastWarning } = useToast();
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"inventory" | "replacements" | "about" | "improvements">("inventory");
+  const [activeTab, setActiveTab] = useState<"inventory" | "replacements" | "about" | "improvements" | "company">("inventory");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileMode, setIsMobileMode] = useState(true);
+
+  // Zgoda użytkownika i polityka bezpieczeństwa
+  const [isTermsAccepted, setIsTermsAccepted] = useState(() => {
+    return localStorage.getItem("scanventory_terms_accepted") === "true";
+  });
+
+  const handleAcceptTerms = () => {
+    localStorage.setItem("scanventory_terms_accepted", "true");
+    setIsTermsAccepted(true);
+    toastSuccess("Zgoda została zapisana. Witamy w systemie SCANVENTORY!");
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -370,6 +384,11 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Blokada aplikacji do czasu zaakceptowania polityki prywatności/bezpieczeństwa
+  if (!isTermsAccepted) {
+    return <ConsentModal onAccept={handleAcceptTerms} />;
+  }
+
   // MOBILE FIELD SCANNER VIEW
   if (isMobile && isMobileMode) {
     return (
@@ -414,6 +433,15 @@ function AppContent() {
               </p>
             </div>
           </div>
+
+          {/* Szybki Skaner Kodów QR */}
+          <MobileQrScanner
+            items={items}
+            onSelectForEdit={(item) => {
+              handleEditItem(item);
+              toastSuccess(`Znaleziono urządzenie: ${item.manufacturer} ${item.model}. Otwarto formularz edycji.`);
+            }}
+          />
 
           {/* Skanowanie / Formularz wejściowy */}
           <div className="bg-white rounded-xl border border-slate-150 p-4 shadow-xs">
@@ -551,6 +579,18 @@ function AppContent() {
             </button>
 
             <button
+              onClick={() => setActiveTab("company")}
+              className={`w-full px-4 py-3 flex items-center gap-3 rounded transition-all text-left text-sm font-semibold cursor-pointer ${
+                activeTab === "company"
+                  ? "bg-blue-600/20 border-r-4 border-blue-500 text-blue-400"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/40"
+              }`}
+            >
+              <Building2 className="w-5 h-5" />
+              <span>Ustawienia placówki</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("about")}
               className={`w-full px-4 py-3 flex items-center gap-3 rounded transition-all text-left text-sm font-semibold cursor-pointer ${
                 activeTab === "about"
@@ -579,7 +619,15 @@ function AppContent() {
           <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
             <div>
               <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
-                {activeTab === "inventory" ? "Ewidencja Urządzeń" : activeTab === "replacements" ? "Rotacja i Wymiany" : activeTab === "improvements" ? "Usprawnienia i Raporty" : "O Programie i Regulamin"}
+                {activeTab === "inventory" 
+                  ? "Ewidencja Urządzeń" 
+                  : activeTab === "replacements" 
+                  ? "Rotacja i Wymiany" 
+                  : activeTab === "improvements" 
+                  ? "Usprawnienia i Raporty" 
+                  : activeTab === "company"
+                  ? "Ustawienia Placówki i QR"
+                  : "O Programie i Regulamin"}
               </h1>
               <p className="text-xs text-slate-400 font-medium">
                 Aktualizacja: Dzisiaj • {items.length} zarejestrowanych zasobów komputerowych
@@ -587,13 +635,13 @@ function AppContent() {
             </div>
             <div className="flex items-center gap-4">
               {/* Mobile Tab Toggles (hidden on desktop) */}
-              <div className="md:hidden flex items-center bg-slate-900/10 p-1 rounded-lg border border-slate-200">
+              <div className="md:hidden flex items-center bg-slate-900/10 p-1 rounded-lg border border-slate-200 overflow-x-auto max-w-[280px] sm:max-w-md">
                 <button
                   onClick={() => {
                     setActiveTab("inventory");
                     setEditingItem(null);
                   }}
-                  className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 ${
                     activeTab === "inventory" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
                   }`}
                 >
@@ -601,7 +649,7 @@ function AppContent() {
                 </button>
                 <button
                   onClick={() => setActiveTab("replacements")}
-                  className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 ${
                     activeTab === "replacements" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
                   }`}
                 >
@@ -609,15 +657,23 @@ function AppContent() {
                 </button>
                 <button
                   onClick={() => setActiveTab("improvements")}
-                  className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 ${
                     activeTab === "improvements" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
                   }`}
                 >
                   Usprawnienia
                 </button>
                 <button
+                  onClick={() => setActiveTab("company")}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 ${
+                    activeTab === "company" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
+                  }`}
+                >
+                  Placówka
+                </button>
+                <button
                   onClick={() => setActiveTab("about")}
-                  className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 ${
                     activeTab === "about" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600"
                   }`}
                 >
@@ -668,6 +724,7 @@ function AppContent() {
                     items={items}
                     onEdit={handleEditItem}
                     onDelete={handleDeleteItem}
+                    onUpdateItems={saveItemsToDatabase}
                   />
                 </div>
 
@@ -693,6 +750,10 @@ function AppContent() {
               <AdvancedFeatures
                 items={items}
                 onUpdateItems={saveItemsToDatabase}
+              />
+            ) : activeTab === "company" ? (
+              <CompanySettings
+                onSaveSuccess={() => toastSuccess("Zapisano dane placówki!")}
               />
             ) : (
               <AboutApp />
