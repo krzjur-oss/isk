@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle, BookOpen, PlusCircle, Camera, FileDown, Sparkles, ArrowRight, CheckSquare, Square, History, Clock } from "lucide-react";
+import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle, BookOpen, PlusCircle, Camera, FileDown, Sparkles, ArrowRight, CheckSquare, Square, History, Clock, Wifi, WifiOff, Activity, Globe, Copy, Check, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { useToast } from "./Toast";
 
 export default function AboutApp() {
+  const { toastWarning } = useToast();
   const [activeSection, setActiveSection] = useState<"info" | "guide" | "changelog" | "author" | "terms" | "license">("info");
   const [buildInfo, setBuildInfo] = useState<{ version: string; lastModified: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -11,6 +13,47 @@ export default function AboutApp() {
     step3: false,
   });
   const [ocrCallsCount, setOcrCallsCount] = useState(0);
+  const [warningThreshold, setWarningThreshold] = useState<number | "">("");
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [swActive, setSwActive] = useState<boolean>(false);
+  const [userApiKey, setUserApiKey] = useState("");
+  const [keyCopySuccess, setKeyCopySuccess] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
+  const handleCopyUserApiKey = () => {
+    if (!userApiKey) return;
+    try {
+      navigator.clipboard.writeText(userApiKey);
+      setKeyCopySuccess(true);
+      setTimeout(() => setKeyCopySuccess(false), 2000);
+    } catch (e) {
+      console.error("Failed to copy key to clipboard:", e);
+    }
+  };
+
+  const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === "") {
+      setWarningThreshold("");
+      localStorage.removeItem("scanventory_ocr_warning_threshold");
+    } else {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed) && parsed >= 0) {
+        setWarningThreshold(parsed);
+        localStorage.setItem("scanventory_ocr_warning_threshold", parsed.toString());
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Warning Toast Alert logic when limits are exceeded
+    if (warningThreshold !== "" && warningThreshold > 0 && ocrCallsCount > warningThreshold) {
+      toastWarning(
+        `Ostrzeżenie! Liczba zapytań OCR (${ocrCallsCount}) przekroczyła ustawiony próg ostrzeżenia (${warningThreshold}).`
+      );
+    }
+  }, [ocrCallsCount, warningThreshold, toastWarning]);
 
   useEffect(() => {
     // Load checklist from localStorage for interactive onboarding feel
@@ -32,6 +75,51 @@ export default function AboutApp() {
     } catch (e) {
       console.error(e);
     }
+
+    // Load OCR warning threshold
+    try {
+      const storedThreshold = localStorage.getItem("scanventory_ocr_warning_threshold");
+      if (storedThreshold) {
+        setWarningThreshold(parseInt(storedThreshold, 10));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    // Network connection checks
+    if (typeof navigator !== "undefined") {
+      setIsOnline(navigator.onLine);
+    }
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Standalone check
+    const checkStandalone = () => {
+      const isStandaloneMedia = window.matchMedia("(display-mode: standalone)").matches;
+      const isStandaloneSafari = (window.navigator as any).standalone === true;
+      setIsStandalone(isStandaloneMedia || isStandaloneSafari);
+    };
+    checkStandalone();
+
+    // Service Worker active check
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        if (registrations && registrations.length > 0) {
+          setSwActive(true);
+        }
+      }).catch((err) => {
+        console.warn("Error checking Service Workers:", err);
+      });
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, []);
 
   const handleResetOcrCounter = () => {
@@ -298,6 +386,33 @@ export default function AboutApp() {
                 </div>
               </div>
 
+              {/* Ustawienie progu ostrzeżenia */}
+              <div className="p-4 bg-white rounded-xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-3xs">
+                <div className="space-y-1">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    Ustaw próg ostrzeżenia dla zapytań OCR
+                  </h5>
+                  <p className="text-[10.5px] text-slate-500 leading-normal">
+                    Wprowadź limit, po którego przekroczeniu system poinformuje Cię alertem o dużym zużyciu darmowego limitu (np. 100, 500, 1200). Pozostaw puste, aby wyłączyć ostrzeżenia.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      max="1500"
+                      placeholder="Wyłączone"
+                      value={warningThreshold}
+                      onChange={handleThresholdChange}
+                      className="w-28 px-3 py-1.5 text-xs text-center font-bold text-slate-800 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-lg focus:outline-none transition-colors shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wide">zapytań</span>
+                </div>
+              </div>
+
               {/* Step-by-step Guide to Get Key */}
               <div className="bg-white/60 rounded-xl p-4 border border-indigo-100/50 space-y-3">
                 <div className="flex items-center gap-2 text-indigo-950 font-bold text-xs pb-1 border-b border-indigo-100/45">
@@ -348,10 +463,132 @@ export default function AboutApp() {
                     </div>
                   </div>
                 </div>
+
+                {/* Interaktywny pomocnik kopiowania klucza */}
+                <div className="mt-3.5 pt-3.5 border-t border-indigo-100/45 space-y-2">
+                  <span className="text-[10px] font-bold text-indigo-950 block">Pomocnik przenoszenia klucza:</span>
+                  <div className="flex gap-2 items-center flex-wrap sm:flex-nowrap">
+                    <div className="relative flex-1 min-w-[200px] w-full">
+                      <input
+                        type={showKey ? "text" : "password"}
+                        value={userApiKey}
+                        onChange={(e) => setUserApiKey(e.target.value)}
+                        placeholder="Wklej klucz z Google AI Studio (np. AIzaSy...)"
+                        className="w-full px-3 py-1.5 pr-9 bg-white border border-slate-200 focus:border-indigo-500 rounded-lg text-xs font-mono shadow-2xs focus:outline-none transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(!showKey)}
+                        disabled={!userApiKey}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40 cursor-pointer"
+                        title={showKey ? "Ukryj klucz" : "Pokaż klucz"}
+                      >
+                        {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={handleCopyUserApiKey}
+                      disabled={!userApiKey}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-2xs cursor-pointer w-full sm:w-auto ${
+                        keyCopySuccess 
+                          ? "bg-emerald-600 text-white" 
+                          : userApiKey 
+                            ? "bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold" 
+                            : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                      }`}
+                    >
+                      {keyCopySuccess ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 animate-bounce" />
+                          Skopiowano!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Skopiuj mój API Key
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[9.5px] text-slate-400 italic leading-snug">
+                    * Wklejenie klucza tutaj ułatwia jego bezpieczne przenoszenie za pomocą schowka i nie jest trwale rejestrowane w bazie danych.
+                  </p>
+                </div>
               </div>
 
               <div className="text-[9.5px] text-slate-400 leading-normal italic bg-white/45 p-2 rounded-md border border-slate-100">
                 * Rzeczywisty darmowy limit odnawia się automatycznie w Google AI Studio. Licznik ma charakter wyłącznie orientacyjny dla celów testowych i weryfikacji liczby zapytań z bieżącej przeglądarki.
+              </div>
+            </div>
+
+            {/* Status sieci i PWA */}
+            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-4">
+              <div className="flex gap-4 items-start">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl shrink-0 shadow-2xs">
+                  <Activity className="h-5.5 w-5.5 animate-pulse" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <h4 className="text-sm font-bold text-slate-800">Status sieci i technologii PWA</h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Bieżąca diagnostyka środowiska uruchomieniowego. Sprawdź status połączenia sieciowego z chmurą Google AI Studio oraz stan instalacji progresywnej aplikacji.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                {/* Network Status Card */}
+                <div className={`p-4 rounded-xl border transition-all duration-200 flex items-center justify-between gap-4 ${
+                  isOnline 
+                    ? "bg-emerald-50/40 border-emerald-100 text-emerald-950" 
+                    : "bg-rose-50/40 border-rose-100 text-rose-950"
+                }`}>
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Połączenie internetowe</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-ping" : "bg-rose-500"}`} />
+                      <span className="text-xs font-bold text-slate-800">
+                        {isOnline ? "Połączony z siecią" : "Brak połączenia (Offline)"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      {isOnline 
+                        ? "Masz stabilne połączenie. Możesz wykonywać zapytania do Gemini API i skanować tabliczki znamionowe."
+                        : "Połączenie przerwane. Zapytania AI OCR oraz synchronizacja bazy danych są chwilowo niedostępne."}
+                    </p>
+                  </div>
+                  <div className={`p-2.5 rounded-lg shrink-0 ${isOnline ? "bg-emerald-100/60 text-emerald-600" : "bg-rose-100/60 text-rose-600"}`}>
+                    {isOnline ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}
+                  </div>
+                </div>
+
+                {/* PWA Installation Status Card */}
+                <div className={`p-4 rounded-xl border transition-all duration-200 flex items-center justify-between gap-4 ${
+                  isStandalone 
+                    ? "bg-emerald-50/40 border-emerald-100 text-emerald-950" 
+                    : "bg-indigo-50/30 border-indigo-100/80 text-indigo-950"
+                }`}>
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Status instalacji PWA</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${isStandalone ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"}`} />
+                      <span className="text-xs font-bold text-slate-800">
+                        {isStandalone ? "Uruchomiono jako aplikację" : "Uruchomiono w przeglądarce"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      {isStandalone 
+                        ? "Aplikacja działa w dedykowanym, niezależnym oknie PWA bez interfejsu przeglądarki."
+                        : swActive 
+                          ? "Gotowy do instalacji! Przeglądarka zarejestrowała Service Worker (sw.js). Kliknij plus na pasku adresu."
+                          : "Aplikacja działa w trybie webowym. Aby zainstalować PWA, otwórz ją bezpośrednio przez HTTPS."}
+                    </p>
+                  </div>
+                  <div className={`p-2.5 rounded-lg shrink-0 ${isStandalone ? "bg-emerald-100/60 text-emerald-600" : "bg-indigo-100/60 text-indigo-600"}`}>
+                    <Globe className="h-5 w-5" />
+                  </div>
+                </div>
               </div>
             </div>
 

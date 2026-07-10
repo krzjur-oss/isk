@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar, Database, QrCode, Printer, Download, Copy, Check, X } from "lucide-react";
+import { Search, Filter, Trash2, Edit, FileDown, FileSpreadsheet, Upload, Laptop, Monitor, Server, HardDrive, Cpu, AlertCircle, HelpCircle, AlertTriangle, Clock, Calendar, Database, QrCode, Printer, Download, Copy, Check, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { generateInventoryPDF } from "../utils/pdfGenerator";
 import QRCode from "qrcode";
 import { useToast } from "./Toast";
@@ -150,6 +150,10 @@ export default function HardwareList({ items, onEdit, onDelete, onUpdateItems }:
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Sorting state
+  const [sortKey, setSortKey] = useState<"manufacturer" | "purchaseDate" | "none">("none");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // QR Code states
   const [qrItem, setQrItem] = useState<InventoryItem | null>(null);
@@ -391,6 +395,43 @@ export default function HardwareList({ items, onEdit, onDelete, onUpdateItems }:
     return matchesSearch && matchesCategory && matchesStatus && matchesOver3Years;
   });
 
+  // Sort the filtered items
+  const sortedItems = React.useMemo(() => {
+    if (sortKey === "none") return filteredItems;
+
+    return [...filteredItems].sort((a, b) => {
+      if (sortKey === "manufacturer") {
+        const valA = (a.manufacturer || "").toLowerCase();
+        const valB = (b.manufacturer || "").toLowerCase();
+        
+        if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      } else if (sortKey === "purchaseDate") {
+        const valA = a.purchaseDate || "";
+        const valB = b.purchaseDate || "";
+        
+        if (!valA && !valB) return 0;
+        if (!valA) return 1;
+        if (!valB) return -1;
+
+        if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      }
+      return 0;
+    });
+  }, [filteredItems, sortKey, sortDirection]);
+
+  const handleSort = (key: "manufacturer" | "purchaseDate") => {
+    if (sortKey === key) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
+
   // Selection handlers
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => 
@@ -599,7 +640,7 @@ export default function HardwareList({ items, onEdit, onDelete, onUpdateItems }:
 
       {/* Main List Table */}
       <div className="overflow-x-auto">
-        {filteredItems.length === 0 ? (
+        {sortedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400 bg-white">
             <Search className="h-10 w-10 text-slate-300 mb-2" />
             <p className="text-sm font-semibold">Brak pasujących urządzeń</p>
@@ -613,12 +654,48 @@ export default function HardwareList({ items, onEdit, onDelete, onUpdateItems }:
                   <input
                     type="checkbox"
                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
-                    checked={filteredItems.length > 0 && filteredItems.every(item => selectedIds.includes(item.id))}
+                    checked={sortedItems.length > 0 && sortedItems.every(item => selectedIds.includes(item.id))}
                     onChange={handleToggleAll}
                   />
                 </th>
                 <th className="py-3.5 px-4 w-12">Podgląd</th>
-                <th className="py-3.5 px-4">Urządzenie</th>
+                <th className="py-3.5 px-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <span className="font-bold text-slate-400 uppercase tracking-wider">Urządzenie</span>
+                    <div className="flex items-center gap-1.5 bg-slate-100/80 px-2 py-0.5 rounded-md normal-case font-medium text-[10px] text-slate-500 w-fit">
+                      <span className="text-slate-400 font-semibold text-[9px] uppercase tracking-wider">Sortuj:</span>
+                      <button
+                        onClick={() => handleSort("manufacturer")}
+                        className={`hover:text-blue-600 transition-colors flex items-center gap-0.5 cursor-pointer ${
+                          sortKey === "manufacturer" ? "text-blue-600 font-extrabold" : "text-slate-400"
+                        }`}
+                        title="Sortuj alfabetycznie według producenta"
+                      >
+                        Producent
+                        {sortKey === "manufacturer" ? (
+                          sortDirection === "asc" ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />
+                        ) : (
+                          <ArrowUpDown className="h-2.5 w-2.5 opacity-60" />
+                        )}
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        onClick={() => handleSort("purchaseDate")}
+                        className={`hover:text-blue-600 transition-colors flex items-center gap-0.5 cursor-pointer ${
+                          sortKey === "purchaseDate" ? "text-blue-600 font-extrabold" : "text-slate-400"
+                        }`}
+                        title="Sortuj według daty zakupu"
+                      >
+                        Data zakupu
+                        {sortKey === "purchaseDate" ? (
+                          sortDirection === "asc" ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />
+                        ) : (
+                          <ArrowUpDown className="h-2.5 w-2.5 opacity-60" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </th>
                 <th className="py-3.5 px-4">Numer seryjny (S/N)</th>
                 <th className="py-3.5 px-4">Specyfikacja</th>
                 <th className="py-3.5 px-4">Relacja wymiany</th>
@@ -627,7 +704,7 @@ export default function HardwareList({ items, onEdit, onDelete, onUpdateItems }:
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-              {filteredItems.map((item) => {
+              {sortedItems.map((item) => {
                 const IconComponent = getCategoryIcon(item.category);
                 
                 // Get name of replaced/replacing device
