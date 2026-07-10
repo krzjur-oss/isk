@@ -612,6 +612,67 @@ export default function AboutApp() {
                 </p>
               </div>
             </div>
+
+            {/* Gemini API limits FAQ Section */}
+            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-4">
+              <div className="flex gap-4 items-start">
+                <div className="p-2.5 bg-slate-100 text-slate-600 rounded-xl shrink-0 shadow-2xs">
+                  <HelpCircle className="h-5.5 w-5.5" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <h4 className="text-sm font-bold text-slate-800">Często zadawane pytania (FAQ) — Limity Gemini API</h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Poznaj odpowiedzi na najczęstsze pytania dotyczące darmowych pakietów API oraz dowiedz się, jak szybko rozwiązać problemy z wyczerpanym limitem.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="p-4 bg-white rounded-xl border border-slate-150 space-y-1.5 shadow-3xs">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    Jakie są darmowe limity i kiedy się odnawiają?
+                  </h5>
+                  <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                    Bezpłatny pakiet (Free Tier) w Google AI Studio dla modelu <strong>Gemini 3.5 Flash</strong> pozwala na wykonanie do <strong>1500 zapytań na dobę</strong> oraz maksymalnie <strong>15 zapytań na minutę</strong>. Dobowy limit odnawia się automatycznie każdego dnia o północy czasu UTC.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-xl border border-slate-150 space-y-1.5 shadow-3xs">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    Co się stanie, gdy darmowy limit zostanie osiągnięty?
+                  </h5>
+                  <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                    Próby skanowania naklejek zakończą się błędem bezpośredniego połączenia (np. status HTTP 429 - Limit wyczerpany). Automatyczne uzupełnianie danych OCR zostanie chwilowo zablokowane. Ewidencję i dane sprzętu nadal można jednak uzupełniać w pełni ręcznie bez żadnych przeszkód.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-xl border border-slate-150 space-y-1.5 shadow-3xs">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    Co zrobić po wyczerpaniu limitu zapytań?
+                  </h5>
+                  <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                    Istnieją dwa błyskawiczne obejścia:
+                    <br />
+                    1. <strong>Użyj innego konta Google:</strong> Zaloguj się w Google AI Studio z innego konta, stwórz nowy darmowy klucz API i wklej go w aplikacji.
+                    <br />
+                    2. <strong>Odczekaj chwilę:</strong> Jeśli błąd wynika z limitu minutowego (RPM), odczekaj 60 sekund. Dobowe limity odnawiają się po upływie doby.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-xl border border-slate-150 space-y-1.5 shadow-3xs">
+                  <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    Czy korzystanie z Gemini API jest w pełni bezpieczne?
+                  </h5>
+                  <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                    Tak! W darmowym Trybie Bezpośrednim (Client-Side) Twój klucz API jest zapisany wyłącznie lokalnie w pamięci przeglądarki (<code className="bg-slate-100 px-1 py-0.2 rounded text-[9.5px]">localStorage</code>) i wysyłany bezpośrednio do Google przez szyfrowane HTTPS. Żaden serwer zewnętrzny nie ma do niego dostępu.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
