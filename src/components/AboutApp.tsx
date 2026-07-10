@@ -272,35 +272,46 @@ export default function AboutApp() {
         {/* SECTION 4: LICENCJA */}
         {activeSection === "license" && (
           <div className="space-y-4 animate-in fade-in duration-150">
-            <h3 className="text-base font-bold text-slate-900 mb-1">Informacje Licencyjne</h3>
+            <h3 className="text-base font-bold text-slate-900 mb-1">Informacje Licencyjne (EULA)</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Program <strong>SCANVENTORY</strong> jest rozpowszechniany na warunkach otwartej licencji <strong>MIT</strong>, umożliwiającej darmowe i elastyczne dostosowanie w strukturach firmowych i edukacyjnych.
+              Program <strong>SCANVENTORY</strong> udostępniany jest do bezpłatnego użytku (zarówno prywatnego, edukacyjnego, jak i administracyjnego), lecz z zachowaniem ścisłych ograniczeń dotyczących praw autorskich, kopiowania, modyfikowania oraz odsprzedaży.
             </p>
 
-            <div className="p-4 bg-slate-900 rounded-lg border border-slate-800 font-mono text-[10px] text-slate-300 leading-relaxed overflow-x-auto select-all">
-              <p className="font-bold text-white mb-2">MIT LICENSE</p>
-              <p className="mb-2">Copyright (c) 2026 Krzysztof Jureczek</p>
-              <p className="mb-2">
-                Permission is hereby granted, free of charge, to any person obtaining a copy
-                of this software and associated documentation files (the "Software"), to deal
-                in the Software without restriction, including without limitation the rights
-                to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-                copies of the Software, and to permit persons to whom the Software is
-                furnished to do so, subject to the following conditions:
-              </p>
-              <p className="mb-2">
-                The above copyright notice and this permission notice shall be included in all
-                copies or substantial portions of the Software.
-              </p>
-              <p>
-                THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-                IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-                FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-                AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-                LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-                OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-                SOFTWARE.
-              </p>
+            <div className="p-5 bg-slate-50 border border-slate-150 rounded-xl space-y-4 max-h-[400px] overflow-y-auto text-left">
+              <div className="border-b border-slate-150 pb-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Typ licencji</span>
+                <p className="text-xs font-bold text-slate-800">Darmowy użytek (zastrzeżony) / Proprietary EULA</p>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-1">1. Dozwolony użytek</h4>
+                  <p>Licencja zezwala na bezpłatne korzystanie, uruchamianie i instalowanie programu na dowolnej liczbie urządzeń do celów prywatnych, oświatowych, administracyjnych i operacyjnych.</p>
+                </div>
+
+                <div className="p-3.5 bg-rose-50/70 border border-rose-150 rounded-lg space-y-2 text-rose-950">
+                  <p className="font-bold text-[10px] uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                    <Shield className="h-4 w-4 text-rose-600 shrink-0" />
+                    Czego absolutnie zabrania się bez pisemnej zgody właściciela:
+                  </p>
+                  <ul className="list-disc pl-4 text-[11px] space-y-1 text-rose-900">
+                    <li><strong>Kopiowania i rozpowszechniania</strong> kodu źródłowego, plików wykonywalnych lub skompilowanego Programu osobom trzecim.</li>
+                    <li><strong>Modyfikowania i wprowadzania zmian</strong> w kodzie źródłowym, adaptacji, tłumaczenia, inżynierii wstecznej (reverse engineering), dekompilacji lub tworzenia utworów zależnych.</li>
+                    <li><strong>Komercjalizacji i wykorzystania komercyjnego</strong> Programu do celów zarobkowych lub świadczenia płatnych usług osobom trzecim.</li>
+                    <li><strong>Sprzedaży, wynajmu i licencjonowania</strong> Programu, oferowania go jako płatnego oprogramowania lub dołączania jako element pakietów handlowych.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-1">2. Własność intelektualna</h4>
+                  <p>Wszystkie prawa autorskie do Programu oraz nazwy SCANVENTORY należą wyłącznie do autora: <strong>Krzysztof Jureczek</strong>. Oprogramowanie nie jest sprzedawane, lecz licencjonowane.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-1">3. Wyłączenie odpowiedzialności</h4>
+                  <p>Oprogramowanie dostarczane jest w stanie, w jakim się znajduje („AS IS”), bez jakiejkolwiek gwarancji. Autor nie ponosi odpowiedzialności za ewentualną utratę danych lub szkody powstałe w wyniku korzystania z programu.</p>
+                </div>
+              </div>
             </div>
           </div>
         )}

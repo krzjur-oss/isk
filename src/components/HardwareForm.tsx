@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { InventoryItem, HardwareCategory, HardwareStatus } from "../types";
-import { Camera, Upload, AlertCircle, Loader2, Sparkles, Check, RefreshCw, Undo } from "lucide-react";
+import { Camera, Upload, AlertCircle, Loader2, Sparkles, Check, RefreshCw, Undo, QrCode, Search, FileUp, X, Info } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface HardwareFormProps {
   onSave: (item: Omit<InventoryItem, "id" | "addedAt" | "lastModifiedAt"> & { id?: string }) => void;
   editingItem: InventoryItem | null;
   onCancelEdit: () => void;
   items: InventoryItem[];
+  onSelectForEdit?: (item: InventoryItem) => void;
 }
 
 // Preset samples for fast and easy testing
@@ -26,7 +28,7 @@ const PRESET_SAMPLES = [
   }
 ];
 
-export default function HardwareForm({ onSave, editingItem, onCancelEdit, items }: HardwareFormProps) {
+export default function HardwareForm({ onSave, editingItem, onCancelEdit, items, onSelectForEdit }: HardwareFormProps) {
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
@@ -53,20 +55,37 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
   const [cameraError, setCameraError] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // QR Code lookup states
+  const [formMode, setFormMode] = useState<"ocr" | "qr">("ocr");
+  const [isQrScannerActive, setIsQrScannerActive] = useState(false);
+  const [qrScannerError, setQrScannerError] = useState("");
+  const [scannedResult, setScannedResult] = useState<{
+    text: string;
+    matchedItem: InventoryItem | null;
+  } | null>(null);
+  const [qrDragActive, setQrDragActive] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
+  const QR_ELEMENT_ID = "qr-reader-container";
 
-  // Clean up camera on unmount
+  // Clean up camera and QR scanner on unmount
   useEffect(() => {
     return () => {
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (qrScannerRef.current && qrScannerRef.current.isScanning) {
+        qrScannerRef.current.stop().catch(console.error);
+      }
     };
   }, []);
 
   const startCamera = async () => {
+    stopQrScanner();
     setCameraError("");
     setIsCameraActive(true);
     setOcrSuccess(false);
@@ -111,6 +130,172 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
     }
   };
 
+  const startQrScanner = async () => {
+    stopCamera();
+    setQrScannerError("");
+    setIsQrScannerActive(true);
+    setScannedResult(null);
+
+    setTimeout(async () => {
+      try {
+        const html5QrCode = new Html5Qrcode(QR_ELEMENT_ID);
+        qrScannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: (width, height) => {
+              const size = Math.min(width, height) * 0.7;
+              return { width: size, height: size };
+            }
+          },
+          (decodedText) => {
+            handleQrSuccess(decodedText, html5QrCode);
+          },
+          () => {
+            // Silently ignore frame scan failures to avoid logs spamming
+          }
+        );
+      } catch (err: any) {
+        console.error("QR Scanner initialization error:", err);
+        setQrScannerError("Nie można uruchomić skanera. Upewnij się, że masz podłączoną kamerę i wyraziłeś zgodę na dostęp.");
+        setIsQrScannerActive(false);
+      }
+    }, 150);
+  };
+
+  const stopQrScanner = async () => {
+    if (qrScannerRef.current) {
+      if (qrScannerRef.current.isScanning) {
+        try {
+          await qrScannerRef.current.stop();
+        } catch (err) {
+          console.error("Failed to stop QR scanner:", err);
+        }
+      }
+      qrScannerRef.current = null;
+    }
+    setIsQrScannerActive(false);
+  };
+
+  const handleQrDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setQrDragActive(true);
+    } else if (e.type === "dragleave") {
+      setQrDragActive(false);
+    }
+  };
+
+  const handleQrDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setQrDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      scanQrFromFile(file);
+    }
+  };
+
+  const handleQrFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      scanQrFromFile(file);
+    }
+  };
+
+  const scanQrFromFile = async (file: File) => {
+    stopCamera();
+    await stopQrScanner();
+
+    setQrScannerError("");
+    setScannedResult(null);
+    setIsQrScannerActive(true);
+
+    try {
+      const html5QrCode = new Html5Qrcode(QR_ELEMENT_ID);
+      const decodedText = await html5QrCode.scanFile(file, true);
+      handleQrSuccess(decodedText, null);
+    } catch (err: any) {
+      console.error("QR File scanning error:", err);
+      setQrScannerError("Nie znaleziono kodu QR/Kreskowego na tym zdjęciu. Upewnij się, że kod jest wyraźny i dobrze doświetlony.");
+      setIsQrScannerActive(false);
+    }
+  };
+
+  const handleQrSuccess = (decodedText: string, scannerInstance: Html5Qrcode | null) => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    } catch (_) {}
+
+    const cleanText = decodedText.trim();
+    
+    const matched = items.find(
+      item => 
+        item.id.toLowerCase() === cleanText.toLowerCase() ||
+        (item.serialNumber && item.serialNumber.trim().toLowerCase() === cleanText.toLowerCase())
+    );
+
+    setScannedResult({
+      text: cleanText,
+      matchedItem: matched || null
+    });
+
+    if (scannerInstance && scannerInstance.isScanning) {
+      scannerInstance.stop().then(() => {
+        setIsQrScannerActive(false);
+      }).catch(console.error);
+    } else if (qrScannerRef.current && qrScannerRef.current.isScanning) {
+      qrScannerRef.current.stop().then(() => {
+        setIsQrScannerActive(false);
+      }).catch(console.error);
+    } else {
+      setIsQrScannerActive(false);
+    }
+  };
+
+  const handleEditScannedItem = (item: InventoryItem) => {
+    if (onSelectForEdit) {
+      onSelectForEdit(item);
+    } else {
+      setManufacturer(item.manufacturer);
+      setModel(item.model);
+      setSerialNumber(item.serialNumber);
+      setProcessor(item.processor);
+      setRam(item.ram);
+      setStorage(item.storage);
+      setGraphics(item.graphics);
+      setOperatingSystem(item.operatingSystem);
+      setCategory(item.category);
+      setStatus(item.status);
+      setNotes(item.notes);
+      setConfidence(item.confidence);
+      setPhotoUrl(item.photoUrl);
+      setReplacesItemId(item.replacesItemId || "");
+      setRoom(item.room || "");
+      setPurchaseDate(item.purchaseDate || "");
+    }
+    setScannedResult(null);
+  };
+
+  const handleCreateNewWithScannedSn = (sn: string) => {
+    resetForm();
+    setSerialNumber(sn);
+    setScannedResult(null);
+    setOcrSuccess(false);
+  };
+
   // Load editing item values if present
   useEffect(() => {
     if (editingItem) {
@@ -131,6 +316,7 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
       setRoom(editingItem.room || "");
       setPurchaseDate(editingItem.purchaseDate || "");
       setOcrSuccess(false);
+      stopQrScanner();
     } else {
       resetForm();
     }
@@ -383,138 +569,370 @@ export default function HardwareForm({ onSave, editingItem, onCancelEdit, items 
 
       {!editingItem && (
         <div className="mb-6">
-          {isCameraActive ? (
-            <div className="border border-slate-300 rounded-xl p-3 bg-slate-950 text-center relative overflow-hidden shadow-inner">
-              <div className="absolute top-2 right-2 z-10">
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="px-2 py-1 bg-black/60 hover:bg-black/90 text-white text-[10px] font-bold rounded-md transition-colors cursor-pointer"
-                >
-                  Zamknij X
-                </button>
-              </div>
-              <video
-                ref={videoRef}
-                className="w-full h-48 object-cover rounded-lg bg-black"
-                playsInline
-                muted
-              />
-              <div className="mt-3 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={capturePhoto}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Camera className="h-4 w-4" />
-                  Zrób zdjęcie (OCR)
-                </button>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                >
-                  Anuluj
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
-                dragActive 
-                  ? "border-blue-500 bg-blue-50/50" 
-                  : "border-slate-200 hover:border-slate-300 bg-slate-50/40 hover:bg-slate-50/80"
+          {/* Sub-tab Switcher inside the Intake Header */}
+          <div className="flex bg-slate-100 p-1 rounded-lg mb-4 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                setFormMode("ocr");
+                stopQrScanner();
+              }}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                formMode === "ocr"
+                  ? "bg-white text-slate-800 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              {isAnalyzing ? (
-                <div className="flex flex-col items-center justify-center py-4">
-                  <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-                  <p className="text-sm font-semibold text-slate-700">Analizowanie zdjęcia przez AI...</p>
-                  <p className="text-xs text-slate-400 mt-1">Używamy technologii OCR i klasyfikacji Gemini</p>
-                </div>
-              ) : photoUrl ? (
-                <div className="flex flex-col items-center justify-center py-2">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 mb-2">
-                    <img src={photoUrl} alt="Podgląd" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              Skaner AI (OCR)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormMode("qr");
+                stopCamera();
+              }}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                formMode === "qr"
+                  ? "bg-white text-slate-800 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <QrCode className="h-3.5 w-3.5 text-blue-500" />
+              Skaner QR (Baza)
+            </button>
+          </div>
+
+          {/* TAB 1: OCR SCANNER */}
+          {formMode === "ocr" && (
+            <div className="space-y-4">
+              {isCameraActive ? (
+                <div className="border border-slate-300 rounded-xl p-3 bg-slate-950 text-center relative overflow-hidden shadow-inner">
+                  <div className="absolute top-2 right-2 z-10">
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="px-2 py-1 bg-black/60 hover:bg-black/90 text-white text-[10px] font-bold rounded-md transition-colors cursor-pointer"
+                    >
+                      Zamknij X
+                    </button>
                   </div>
-                  <p className="text-xs font-semibold text-blue-600 flex items-center gap-1">
-                    <Check className="h-3.5 w-3.5" /> Zdjęcie wczytane
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Kliknij, aby zmienić zdjęcie</p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startCamera();
-                    }}
-                    className="mt-3 px-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[10px] font-bold text-slate-700 rounded-md flex items-center gap-1 transition-all cursor-pointer"
-                  >
-                    <Camera className="h-3 w-3" />
-                    Użyj aparatu zamiast pliku
-                  </button>
+                  <video
+                    ref={videoRef}
+                    className="w-full h-48 object-cover rounded-lg bg-black"
+                    playsInline
+                    muted
+                  />
+                  <div className="mt-3 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={capturePhoto}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Zrób zdjęcie (OCR)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Anuluj
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-3">
-                  <div className="p-2 bg-white rounded-full shadow-sm border border-slate-100 mb-2">
-                    <Upload className="h-5 w-5 text-slate-400" />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-700">Wgraj zdjęcie naklejki znamionowej</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Przeciągnij i upuść zdjęcie lub kliknij, aby wybrać</p>
+                <div
+                  onDragEnter={handleDrag}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                    dragActive 
+                      ? "border-blue-500 bg-blue-50/50" 
+                      : "border-slate-200 hover:border-slate-300 bg-slate-50/40 hover:bg-slate-50/80"
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  {isAnalyzing ? (
+                    <div className="flex flex-col items-center justify-center py-4">
+                      <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
+                      <p className="text-sm font-semibold text-slate-700">Analizowanie zdjęcia przez AI...</p>
+                      <p className="text-xs text-slate-400 mt-1">Używamy technologii OCR i klasyfikacji Gemini</p>
+                    </div>
+                  ) : photoUrl ? (
+                    <div className="flex flex-col items-center justify-center py-2">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 mb-2">
+                        <img src={photoUrl} alt="Podgląd" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                      <p className="text-xs font-semibold text-blue-600 flex items-center gap-1">
+                        <Check className="h-3.5 w-3.5" /> Zdjęcie wczytane
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Kliknij, aby zmienić zdjęcie</p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startCamera();
+                        }}
+                        className="mt-3 px-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[10px] font-bold text-slate-700 rounded-md flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <Camera className="h-3 w-3" />
+                        Użyj aparatu zamiast pliku
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-3">
+                      <div className="p-2 bg-white rounded-full shadow-sm border border-slate-100 mb-2">
+                        <Upload className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700">Wgraj zdjęcie naklejki znamionowej</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Przeciągnij i upuść zdjęcie lub kliknij, aby wybrać</p>
+                      
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startCamera();
+                        }}
+                        className="mt-3.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-blue-500/10"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        Zrób zdjęcie aparatem (telefon/PC)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {cameraError && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-start gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{cameraError}</span>
+                </div>
+              )}
+
+              {/* Preset templates for easy testing */}
+              <div className="mt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Szybkie demo (wybierz naklejkę testową):
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PRESET_SAMPLES.map((preset, idx) => (
+                    <button
+                      key={`preset-${idx}`}
+                      type="button"
+                      onClick={() => triggerSampleImage(preset)}
+                      className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/30 text-left transition-all cursor-pointer"
+                    >
+                      <p className="text-xs font-semibold text-slate-700 truncate">{preset.name}</p>
+                      <p className="text-[9px] text-slate-400 line-clamp-1 mt-0.5">{preset.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: QR CODE SCANNER */}
+          {formMode === "qr" && (
+            <div className="space-y-4">
+              {isQrScannerActive ? (
+                <div className="border border-slate-300 rounded-xl p-3 bg-slate-950 text-center relative overflow-hidden shadow-inner">
+                  {/* Container for html5-qrcode */}
+                  <div id={QR_ELEMENT_ID} className="w-full h-48 rounded-lg overflow-hidden bg-black relative" />
                   
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startCamera();
-                    }}
-                    className="mt-3.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-blue-500/10"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    Zrób zdjęcie aparatem (telefon/PC)
-                  </button>
+                  {/* Red/Blue pulsating line scanner visual overlay */}
+                  <div className="absolute inset-x-3 top-3 bottom-14 pointer-events-none flex items-center justify-center">
+                    <div className="w-[180px] h-[120px] border border-blue-500/50 rounded flex items-center justify-center relative">
+                      <div className="absolute w-full h-[1.5px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse" />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={stopQrScanner}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Zatrzymaj skanowanie
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Scanned result detail card */}
+                  {scannedResult ? (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zeskanowany kod:</span>
+                        <span className="font-mono text-xs font-bold bg-slate-200 px-2 py-0.5 rounded text-slate-700 break-all">{scannedResult.text}</span>
+                      </div>
+
+                      {scannedResult.matchedItem ? (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-800 text-xs flex gap-2">
+                            <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold">Urządzenie znalezione w bazie!</p>
+                              <p className="mt-0.5 text-slate-600">Możesz teraz przejść do jego edycji lub zeskanować inny kod.</p>
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-slate-150 rounded-lg p-3 text-xs space-y-1.5 text-left shadow-xs">
+                            <p className="font-bold text-slate-800 text-sm">
+                              {scannedResult.matchedItem.manufacturer} {scannedResult.matchedItem.model}
+                            </p>
+                            <div className="grid grid-cols-2 gap-y-1 text-slate-500 text-[11px] pt-1">
+                              <div><span className="font-semibold text-slate-400">S/N:</span> <code className="font-mono text-slate-700">{scannedResult.matchedItem.serialNumber || "brak"}</code></div>
+                              <div><span className="font-semibold text-slate-400">Lokalizacja:</span> <span className="text-slate-700 font-medium">{scannedResult.matchedItem.room || "brak"}</span></div>
+                              <div><span className="font-semibold text-slate-400">Kategoria:</span> <span className="text-slate-700 font-medium">{scannedResult.matchedItem.category}</span></div>
+                              <div><span className="font-semibold text-slate-400">Status:</span> <span className="text-slate-700 font-medium">{scannedResult.matchedItem.status}</span></div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditScannedItem(scannedResult.matchedItem!)}
+                              className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                            >
+                              <Undo className="h-3.5 w-3.5 rotate-90" />
+                              Edytuj to urządzenie
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScannedResult(null);
+                                startQrScanner();
+                              }}
+                              className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-200 transition-all cursor-pointer"
+                            >
+                              Skanuj ponownie
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-xs flex gap-2">
+                            <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold">Brak urządzenia w bazie</p>
+                              <p className="mt-0.5 text-slate-600">Zeskanowany kod nie pasuje do żadnego S/N ani ID zasobu.</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCreateNewWithScannedSn(scannedResult.text)}
+                              className="w-full py-2 bg-slate-900 hover:bg-slate-850 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                              Utwórz nowe urządzenie z tym S/N
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScannedResult(null);
+                                startQrScanner();
+                              }}
+                              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-200 transition-all cursor-pointer"
+                            >
+                              Skanuj ponownie
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      onDragEnter={handleQrDrag}
+                      onDragOver={handleQrDrag}
+                      onDragLeave={handleQrDrag}
+                      onDrop={handleQrDrop}
+                      onClick={() => qrFileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                        qrDragActive 
+                          ? "border-blue-500 bg-blue-50/50" 
+                          : "border-slate-200 hover:border-slate-300 bg-slate-50/40 hover:bg-slate-50/80"
+                      }`}
+                    >
+                      <input
+                        ref={qrFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleQrFileChange}
+                        className="hidden"
+                      />
+                      <div className="flex flex-col items-center justify-center py-3">
+                        <div className="p-2 bg-white rounded-full shadow-sm border border-slate-100 mb-2">
+                          <QrCode className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <p className="text-sm font-semibold text-slate-700 font-bold">Wyszukaj urządzenie kodem QR/Kreskowym</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Uruchom aparat inwentaryzacyjny lub wgraj plik z kodem</p>
+                        
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startQrScanner();
+                          }}
+                          className="mt-3.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-blue-500/10"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          Skanuj aparatem (QR / Barcode)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quick Text Search Box as a helper fallback */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 text-left">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Szybkie wyszukiwanie ręczne (S/N):</span>
+                    <form 
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const val = (e.currentTarget.elements.namedItem("manualSearchValue") as HTMLInputElement).value;
+                        if (val.trim()) {
+                          handleQrSuccess(val, null);
+                        }
+                      }}
+                      className="flex gap-2"
+                    >
+                      <input
+                        type="text"
+                        name="manualSearchValue"
+                        placeholder="Wpisz S/N np. LNV-T14G2-XYZ"
+                        className="flex-1 text-xs font-mono p-2 bg-white border border-slate-200 rounded focus:border-blue-500 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded cursor-pointer flex items-center gap-1"
+                      >
+                        <Search className="h-3 w-3" />
+                        Szukaj
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {qrScannerError && (
+                <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 flex items-start gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{qrScannerError}</span>
                 </div>
               )}
             </div>
           )}
-
-          {cameraError && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-start gap-1.5">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              <span>{cameraError}</span>
-            </div>
-          )}
-
-          {/* Preset templates for easy testing */}
-          <div className="mt-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Szybkie demo (wybierz naklejkę testową):
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {PRESET_SAMPLES.map((preset, idx) => (
-                <button
-                  key={`preset-${idx}`}
-                  type="button"
-                  onClick={() => triggerSampleImage(preset)}
-                  className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/30 text-left transition-all cursor-pointer"
-                >
-                  <p className="text-xs font-semibold text-slate-700 truncate">{preset.name}</p>
-                  <p className="text-[9px] text-slate-400 line-clamp-1 mt-0.5">{preset.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
