@@ -222,7 +222,7 @@ export default function AboutApp() {
                 <div>
                   <h3 className="text-base font-bold text-slate-900 mb-1 flex flex-wrap items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    Inteligentny System Inwentaryzacji — SCANVENTORY (v{buildInfo?.version || "1.2.0"})
+                    Inteligentny System Inwentaryzacji — SCANVENTORY (v{buildInfo?.version || "1.3.0"})
                   </h3>
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-150 flex items-center gap-1">
@@ -287,7 +287,7 @@ export default function AboutApp() {
                 <div className="space-y-2 text-[10px]">
                   <div className="flex justify-between border-b border-slate-200 pb-1.5">
                     <span className="text-slate-500 font-medium">Wersja systemu</span>
-                    <span className="text-blue-600 font-bold">{buildInfo?.version || "1.2.0"}</span>
+                    <span className="text-blue-600 font-bold">{buildInfo?.version || "1.3.0"}</span>
                   </div>
                   <div className="flex flex-col border-b border-slate-200 pb-1.5 gap-0.5">
                     <span className="text-slate-500 font-medium">Ostatnia edycja plików</span>
@@ -766,7 +766,7 @@ export default function AboutApp() {
             {/* Timeline Wrapper */}
             <div className="relative border-l-2 border-indigo-100 ml-4 pl-8 space-y-8 py-4">
 
-              {/* Version 1.2.0 */}
+              {/* Version 1.3.0 */}
               <div className="relative">
                 {/* Visual marker on the line */}
                 <div className="absolute -left-[41px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full border-2 border-blue-500 bg-white shadow-xs">
@@ -774,11 +774,44 @@ export default function AboutApp() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">v1.2.0</span>
+                    <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">v1.3.0</span>
                     <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
                       <Clock className="h-3 w-3" /> 10 lipca 2026 r. (Aktualne wydanie)
                     </span>
                     <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-200 ml-auto">Najnowsza</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Dynamiczne Sortowanie Listy, Kontrola Limitów OCR oraz Aktualizacja Gemini API 3.5</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Wprowadziliśmy zaawansowane mechanizmy sortowania ewidencji sprzętowej, elastyczną kontrolę zużycia limitów zapytań AI oraz wdrożyliśmy najnowszy model Gemini-3.5-Flash dla maksymalnej stabilności i wydajności skanera.
+                  </p>
+                  <ul className="space-y-1.5 pl-1">
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>Zintegrowane sortowanie w tabeli:</strong> Wygodne przyciski w nagłówku tabeli sprzętu umożliwiające natychmiastowe sortowanie alfabetyczne według producenta oraz chronologiczne według daty zakupu (od najnowszych i najstarszych).</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-150 mt-0.5 shrink-0">NOWOŚĆ</span>
+                      <span><strong>Próg Ostrzeżeń Limitów OCR:</strong> Nowe, konfigurowalne ustawienie w panelu informacyjnym pozwalające określić własny limit zapytań OCR. Po jego przekroczeniu system automatycznie wyświetla estetyczne ostrzeżenie w powiadomieniach Toast.</span>
+                    </li>
+                    <li className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-150 mt-0.5 shrink-0">AKTUALIZACJA</span>
+                      <span><strong>Przejście na model Gemini 3.5:</strong> Całkowite zmigrowanie silnika Trybu Bezpośredniego (Client-Side) na najnowszy model <code>gemini-3.5-flash</code> w miejsce wycofanego modelu <code>gemini-2.5-flash</code>, co rozwiązuje problemy z połączeniem dla nowych użytkowników.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Version 1.2.0 */}
+              <div className="relative">
+                <div className="absolute -left-[41px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full border-2 border-indigo-300 bg-white shadow-xs">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-indigo-600 font-mono bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">v1.2.0</span>
+                    <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 5 lipca 2026 r.
+                    </span>
                   </div>
                   <h4 className="text-sm font-bold text-slate-800">Uproszczony Tryb Terenowy i Interaktywny Onboarding</h4>
                   <p className="text-xs text-slate-600 leading-relaxed">

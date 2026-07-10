@@ -166,12 +166,12 @@ Zwróć dane w formacie JSON pasującym do tego schematu. Nie dodawaj żadnych z
 
       res.json({
         lastModified: finalTime.toISOString(),
-        version: "1.2.0"
+        version: "1.3.0"
       });
     } catch (error: any) {
       res.json({
         lastModified: new Date().toISOString(),
-        version: "1.2.0"
+        version: "1.3.0"
       });
     }
   });

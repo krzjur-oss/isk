@@ -4,12 +4,13 @@ Nowoczesny, intuicyjny system wspierający proces ewidencji i inwentaryzacji spr
 
 ## 🚀 Główne Funkcje Systemu
 
-- **Automatyczne odczytywanie danych (OCR) z Gemini AI:** Szybkie dodawanie sprzętu poprzez wykonanie zdjęcia lub wgranie zdjęcia tabliczki znamionowej bądź naklejki seryjnej. Sztuczna inteligencja automatycznie wyodrębnia producenta, model, numer seryjny, system operacyjny oraz specyfikację sprzętową (procesor, RAM, dysk).
+- **Automatyczne odczytywanie danych (OCR) z Gemini AI (wersja 3.5-Flash):** Szybkie dodawanie sprzętu poprzez wykonanie zdjęcia lub wgranie zdjęcia tabliczki znamionowej bądź naklejki seryjnej. Sztuczna inteligencja automatycznie wyodrębnia producenta, model, numer seryjny, system operacyjny oraz specyfikację sprzętową (procesor, RAM, dysk).
 - **Bezpośrednia obsługa aparatu (Wideo/Foto):** Integracja z kamerą telefonu, tabletu lub komputera pozwala na natychmiastowe wykonanie zdjęcia tabliczki znamionowej na miejscu w sali lekcyjnej i automatyczne uzupełnienie danych.
 - **Ewidencja Sal i Lokalizacji:** Każde urządzenie ma przypisaną konkretną salę (np. *Sala 102*, *Pracownia Informatyczna*, *Sekretariat*), co pozwala na natychmiastowe zlokalizowanie sprzętu w placówce.
 - **Zarządzanie Łańcuchem Wymian:** Rejestracja procesu zastępowania wyeksploatowanego sprzętu nowym. System śledzi, które urządzenie zostało zastąpione przez które, zachowując historię i automatycznie aktualizując statusy (np. zmiana starego na *Wycofany*, a nowego na *W użyciu*).
 - **Profesjonalne Raporty i Protokoły PDF:** Generowanie gotowych do wydruku zestawień inwentaryzacyjnych oraz szczegółowych protokołów wymiany sprzętu komputerowego (np. dla dyrekcji lub kuratorium), w pełni obsługujących polskie znaki diakrytyczne.
-- **Filtrowanie i wyszukiwanie:** Błyskawiczne filtrowanie sprzętu po kategorii (komputer stacjonarny, laptop, tablet, inne), statusie (W użyciu, Magazyn, Wycofany, W naprawie) oraz wyszukiwanie tekstowe (w tym po nazwie sali, producencie czy numerze seryjnym).
+- **Filtrowanie, wyszukiwanie i dynamiczne sortowanie:** Błyskawiczne filtrowanie sprzętu po kategorii i statusie, zaawansowane wyszukiwanie tekstowe oraz natychmiastowe sortowanie listy według producenta alfabetycznie lub chronologicznie według daty zakupu.
+- **System Kontroli Limitów OCR:** Konfigurowalny próg ostrzeżeń przed nadmiernym zużyciem darmowego limitu API OCR. Gdy liczba wykonanych skanowań przekroczy wskazany limit, system natychmiast wyświetli czytelne ostrzeżenie.
 
 ## ⚖️ Zgodność z Przepisami Prawnymi w Polsce
 
