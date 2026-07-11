@@ -8,7 +8,7 @@ import AboutApp from "./components/AboutApp";
 import AdvancedFeatures from "./components/AdvancedFeatures";
 import CompanySettings from "./components/CompanySettings";
 import MobileQrScanner from "./components/MobileQrScanner";
-import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle, Smartphone, FileSpreadsheet, Upload, FileDown, BookOpen, Building2 } from "lucide-react";
+import { Laptop, Cpu, RotateCw, Database, Layers, RefreshCw, Sparkles, Info, Cloud, LogIn, LogOut, AlertTriangle, Smartphone, FileSpreadsheet, Upload, FileDown, BookOpen, Building2, Download } from "lucide-react";
 import { ToastProvider, useToast } from "./components/Toast";
 import ConsentModal from "./components/ConsentModal";
 
@@ -126,6 +126,8 @@ function AppContent() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileMode, setIsMobileMode] = useState(true);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any | null>(null);
 
   // Zgoda użytkownika i polityka bezpieczeństwa
   const [isTermsAccepted, setIsTermsAccepted] = useState(() => {
@@ -146,6 +148,65 @@ function AppContent() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Standalone mode and PWA deferred prompt handling
+  useEffect(() => {
+    const checkStandalone = () => {
+      const isStandaloneMedia = window.matchMedia("(display-mode: standalone)").matches;
+      const isStandaloneSafari = (window.navigator as any).standalone === true;
+      setIsStandalone(isStandaloneMedia || isStandaloneSafari);
+    };
+    checkStandalone();
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      toastInfo("Aplikacja SCANVENTORY jest gotowa do instalacji! Kliknij przycisk instalacji na dole ekranu.");
+    };
+
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setIsStandalone(true);
+      toastSuccess("Aplikacja SCANVENTORY została pomyślnie zainstalowana!");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === "accepted") {
+          toastSuccess("Dziękujemy za zainstalowanie naszej aplikacji!");
+          setDeferredPrompt(null);
+        } else {
+          toastInfo("Instalacja została anulowana.");
+        }
+      } catch (err) {
+        console.error("Installation prompt error:", err);
+        toastError("Wystąpił problem podczas uruchamiania instalacji.");
+      }
+    } else {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS) {
+        toastInfo(
+          "Instalacja na iOS: kliknij przycisk 'Udostępnij' w Safari (kwadrat ze strzałką w górę), a następnie wybierz 'Do ekranu początkowego'."
+        );
+      } else {
+        toastInfo(
+          "Aby zainstalować aplikację: kliknij menu przeglądarki (trzy kropki) i wybierz 'Zainstaluj aplikację' lub 'Dodaj do ekranu głównego'."
+        );
+      }
+    }
+  };
 
   const handleExportCSV = () => {
     if (items.length === 0) {
@@ -507,6 +568,19 @@ function AppContent() {
         <footer className="bg-slate-50 border-t border-slate-200 py-2.5 text-center text-[9px] text-slate-400 font-bold font-mono tracking-wider shrink-0">
           SCANVENTORY • MOBILE FIELD AGENT
         </footer>
+
+        {/* Floating Action Button (FAB) for PWA Installation */}
+        {!isStandalone && (
+          <button
+            onClick={handleInstallClick}
+            className="fixed bottom-8 right-5 z-40 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-2 px-4.5 py-3 rounded-full shadow-lg shadow-blue-500/20 border border-blue-400/30 font-bold text-xs tracking-wide hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            id="pwa-install-fab"
+            title="Zainstaluj aplikację na telefonie"
+          >
+            <Download className="h-4 w-4 text-blue-200 animate-bounce" />
+            <span>Zainstaluj App</span>
+          </button>
+        )}
       </div>
     );
   }

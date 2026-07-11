@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle, BookOpen, PlusCircle, Camera, FileDown, Sparkles, ArrowRight, CheckSquare, Square, History, Clock, Wifi, WifiOff, Activity, Globe, Copy, Check, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Info, User, FileText, Shield, CheckCircle, ExternalLink, AlertCircle, Terminal, HelpCircle, BookOpen, PlusCircle, Camera, FileDown, Sparkles, ArrowRight, CheckSquare, Square, History, Clock, Wifi, WifiOff, Activity, Globe, Copy, Check, Eye, EyeOff, AlertTriangle, Database, Trash2 } from "lucide-react";
 import { useToast } from "./Toast";
 import { jsPDF } from "jspdf";
 
 export default function AboutApp() {
   const { toastWarning, toastSuccess } = useToast();
-  const [activeSection, setActiveSection] = useState<"info" | "guide" | "changelog" | "author" | "terms" | "license">("info");
+  const [activeSection, setActiveSection] = useState<"info" | "guide" | "changelog" | "author" | "terms" | "license" | "faq" | "limits">("info");
   const [buildInfo, setBuildInfo] = useState<{ version: string; lastModified: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({
@@ -21,6 +21,8 @@ export default function AboutApp() {
   const [userApiKey, setUserApiKey] = useState("");
   const [keyCopySuccess, setKeyCopySuccess] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [localStorageUsage, setLocalStorageUsage] = useState(0);
+  const [confirmClearDb, setConfirmClearDb] = useState(false);
 
   const handleCopyUserApiKey = () => {
     if (!userApiKey) return;
@@ -191,6 +193,59 @@ export default function AboutApp() {
     }
   };
 
+  const handleExportDatabase = () => {
+    try {
+      const itemsStr = localStorage.getItem("it_inventory_items_v1") || "[]";
+      const blob = new Blob([itemsStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `scanventory_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (toastSuccess) {
+        toastSuccess("Pomyślnie wyeksportowano bazę danych do pliku JSON!");
+      }
+    } catch (e: any) {
+      console.error(e);
+      if (toastWarning) {
+        toastWarning("Błąd eksportu bazy danych: " + e.message);
+      }
+    }
+  };
+
+  const handleClearDatabase = () => {
+    try {
+      localStorage.setItem("it_inventory_items_v1", "[]");
+      if (toastSuccess) {
+        toastSuccess("Baza danych ewidencji sprzętowej została wyczyszczona!");
+      }
+      setConfirmClearDb(false);
+      // Recalculate localStorage usage
+      let total = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          const value = localStorage.getItem(key) || "";
+          total += key.length + value.length;
+        }
+      }
+      setLocalStorageUsage(total);
+      
+      // Reload page to refresh all active lists and state in parent components
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (e: any) {
+      console.error(e);
+      if (toastWarning) {
+        toastWarning("Błąd podczas czyszczenia bazy danych: " + e.message);
+      }
+    }
+  };
+
   useEffect(() => {
     // Warning Toast Alert logic when limits are exceeded
     if (warningThreshold !== "" && warningThreshold > 0 && ocrCallsCount > warningThreshold) {
@@ -261,6 +316,24 @@ export default function AboutApp() {
       });
     }
 
+    // Calculate localStorage usage
+    const calculateUsage = () => {
+      try {
+        let total = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) {
+            const value = localStorage.getItem(key) || "";
+            total += key.length + value.length;
+          }
+        }
+        setLocalStorageUsage(total);
+      } catch (e) {
+        console.error("Error calculating localStorage usage:", e);
+      }
+    };
+    calculateUsage();
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
@@ -324,6 +397,8 @@ export default function AboutApp() {
   const sections = [
     { id: "info", label: "O Programie", icon: Info },
     { id: "guide", label: "Przewodnik", icon: BookOpen },
+    { id: "faq", label: "FAQ", icon: HelpCircle },
+    { id: "limits", label: "Monitor limitu", icon: Database },
     { id: "changelog", label: "Historia zmian", icon: History },
     { id: "author", label: "O Autorze", icon: User },
     { id: "terms", label: "Regulamin", icon: FileText },
@@ -463,7 +538,12 @@ export default function AboutApp() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
+        {/* SECTION: MONITOR LIMITU (Część 1) */}
+        {activeSection === "limits" && (
+          <div className="space-y-6 animate-in fade-in duration-150">
             {/* Gemini API Free Quota Tracker */}
             <div className="p-5 bg-indigo-50/30 rounded-xl border border-indigo-100/80 space-y-4">
               <div className="flex gap-4 items-start">
@@ -667,76 +747,12 @@ export default function AboutApp() {
                 * Rzeczywisty darmowy limit odnawia się automatycznie w Google AI Studio. Licznik ma charakter wyłącznie orientacyjny dla celów testowych i weryfikacji liczby zapytań z bieżącej przeglądarki.
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Status sieci i PWA */}
-            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-4">
-              <div className="flex gap-4 items-start">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl shrink-0 shadow-2xs">
-                  <Activity className="h-5.5 w-5.5 animate-pulse" />
-                </div>
-                <div className="space-y-1 flex-1">
-                  <h4 className="text-sm font-bold text-slate-800">Status sieci i technologii PWA</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Bieżąca diagnostyka środowiska uruchomieniowego. Sprawdź status połączenia sieciowego z chmurą Google AI Studio oraz stan instalacji progresywnej aplikacji.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                {/* Network Status Card */}
-                <div className={`p-4 rounded-xl border transition-all duration-200 flex items-center justify-between gap-4 ${
-                  isOnline 
-                    ? "bg-emerald-50/40 border-emerald-100 text-emerald-950" 
-                    : "bg-rose-50/40 border-rose-100 text-rose-950"
-                }`}>
-                  <div className="space-y-1.5">
-                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Połączenie internetowe</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-ping" : "bg-rose-500"}`} />
-                      <span className="text-xs font-bold text-slate-800">
-                        {isOnline ? "Połączony z siecią" : "Brak połączenia (Offline)"}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-tight">
-                      {isOnline 
-                        ? "Masz stabilne połączenie. Możesz wykonywać zapytania do Gemini API i skanować tabliczki znamionowe."
-                        : "Połączenie przerwane. Zapytania AI OCR oraz synchronizacja bazy danych są chwilowo niedostępne."}
-                    </p>
-                  </div>
-                  <div className={`p-2.5 rounded-lg shrink-0 ${isOnline ? "bg-emerald-100/60 text-emerald-600" : "bg-rose-100/60 text-rose-600"}`}>
-                    {isOnline ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}
-                  </div>
-                </div>
-
-                {/* PWA Installation Status Card */}
-                <div className={`p-4 rounded-xl border transition-all duration-200 flex items-center justify-between gap-4 ${
-                  isStandalone 
-                    ? "bg-emerald-50/40 border-emerald-100 text-emerald-950" 
-                    : "bg-indigo-50/30 border-indigo-100/80 text-indigo-950"
-                }`}>
-                  <div className="space-y-1.5">
-                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Status instalacji PWA</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${isStandalone ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"}`} />
-                      <span className="text-xs font-bold text-slate-800">
-                        {isStandalone ? "Uruchomiono jako aplikację" : "Uruchomiono w przeglądarce"}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-tight">
-                      {isStandalone 
-                        ? "Aplikacja działa w dedykowanym, niezależnym oknie PWA bez interfejsu przeglądarki."
-                        : swActive 
-                          ? "Gotowy do instalacji! Przeglądarka zarejestrowała Service Worker (sw.js). Kliknij plus na pasku adresu."
-                          : "Aplikacja działa w trybie webowym. Aby zainstalować PWA, otwórz ją bezpośrednio przez HTTPS."}
-                    </p>
-                  </div>
-                  <div className={`p-2.5 rounded-lg shrink-0 ${isStandalone ? "bg-emerald-100/60 text-emerald-600" : "bg-indigo-100/60 text-indigo-600"}`}>
-                    <Globe className="h-5 w-5" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
+        {/* SECTION: FAQ */}
+        {activeSection === "faq" && (
+          <div className="space-y-6 animate-in fade-in duration-150">
             {/* PWA Section */}
             <div className="p-5 bg-blue-50/40 rounded-xl border border-blue-100 flex gap-4 items-start">
               <div className="p-2 bg-blue-100/50 rounded-lg text-blue-600 shrink-0">
@@ -816,6 +832,136 @@ export default function AboutApp() {
                     Tak! W darmowym Trybie Bezpośrednim (Client-Side) Twój klucz API jest zapisany wyłącznie lokalnie w pamięci przeglądarki (<code className="bg-slate-100 px-1 py-0.2 rounded text-[9.5px]">localStorage</code>) i wysyłany bezpośrednio do Google przez szyfrowane HTTPS. Żaden serwer zewnętrzny nie ma do niego dostępu.
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION: MONITOR LIMITU (Część 2) */}
+        {activeSection === "limits" && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Monitor Zajętości LocalStorage */}
+            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-4">
+              <div className="flex gap-4 items-start">
+                <div className={`p-2.5 rounded-xl shrink-0 shadow-2xs ${
+                  localStorageUsage > 4 * 1024 * 1024 
+                    ? "bg-rose-50 text-rose-600 animate-pulse" 
+                    : localStorageUsage > 3 * 1024 * 1024 
+                      ? "bg-amber-50 text-amber-600" 
+                      : "bg-blue-50 text-blue-600"
+                }`}>
+                  <Database className="h-5.5 w-5.5" />
+                </div>
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-sm font-bold text-slate-800">Monitor Pamięci Przeglądarki (LocalStorage)</h4>
+                    <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                      localStorageUsage > 4 * 1024 * 1024 
+                        ? "bg-rose-100 text-rose-800" 
+                        : localStorageUsage > 3 * 1024 * 1024 
+                          ? "bg-amber-100 text-amber-800" 
+                          : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {localStorageUsage > 4 * 1024 * 1024 
+                        ? "Krytyczna Zajętość!" 
+                        : localStorageUsage > 3 * 1024 * 1024 
+                          ? "Wysoka Zajętość" 
+                          : "Optymalny Stan"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Wszystkie dane inwentaryzacyjne, historia wymian, ustawienia i preferencje są zapisywane lokalnie w bazie danych przeglądarki. Standardowy limit pamięci wynosi <strong>5 MB (5120 KB)</strong>. Dbaj o to, aby regularnie eksportować pliki kopii zapasowej.
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Bar Container */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                  <span>Wykorzystana przestrzeń localStorage</span>
+                  <span className={`${
+                    localStorageUsage > 4 * 1024 * 1024 
+                      ? "text-rose-600" 
+                      : localStorageUsage > 3 * 1024 * 1024 
+                        ? "text-amber-600" 
+                        : "text-blue-600"
+                  }`}>
+                    {(localStorageUsage / 1024).toFixed(2)} KB / 5120.00 KB ({Math.min(100, (localStorageUsage / (5 * 1024 * 1024)) * 100).toFixed(2)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200/50 p-0.5">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      localStorageUsage > 4 * 1024 * 1024 
+                        ? "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" 
+                        : localStorageUsage > 3 * 1024 * 1024 
+                          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" 
+                          : "bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
+                    }`}
+                    style={{ width: `${Math.min(100, (localStorageUsage / (5 * 1024 * 1024)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Warnings / Suggestion Alerts */}
+              {localStorageUsage > 3 * 1024 * 1024 ? (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex gap-3 items-start animate-in fade-in duration-150">
+                  <AlertTriangle className="h-4.5 w-4.5 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="space-y-1 text-amber-950">
+                    <span className="text-xs font-bold block">Zbliżasz się do limitu pamięci przeglądarki!</span>
+                    <p className="text-[10.5px] text-amber-800 leading-normal">
+                      Zajęte jest już ponad 60% pojemności bazy lokalnej. Przeglądarka może wkrótce zacząć odrzucać nowe wpisy sprzętu lub zdjęcia. Zdecydowanie zalecamy pobranie pliku kopii zapasowej (JSON), a następnie wyczyszczenie bazy danych w celu zwolnienia pamięci.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50/40 border border-blue-100/60 rounded-xl flex gap-2.5 items-start">
+                  <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                  <p className="text-[10.5px] text-slate-600 leading-normal">
+                    Twoja baza działa stabilnie i ma mnóstwo wolnego miejsca. Mimo to, dobrym nawykiem inwentaryzatora jest pobieranie kopii zapasowej przed większymi aktualizacjami.
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleExportDatabase}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg cursor-pointer"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Eksportuj bazę (JSON)
+                </button>
+
+                {!confirmClearDb ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClearDb(true)}
+                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Wyczyść bazę danych
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap bg-rose-50 border border-rose-200/60 p-2 rounded-xl animate-in fade-in duration-150">
+                    <span className="text-[10.5px] text-rose-950 font-bold px-2">Czy na pewno? To usunie cały sprzęt!</span>
+                    <button
+                      type="button"
+                      onClick={handleClearDatabase}
+                      className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer"
+                    >
+                      Tak, wyczyść
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmClearDb(false)}
+                      className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-bold rounded-lg transition-all cursor-pointer"
+                    >
+                      Anuluj
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1271,6 +1417,49 @@ export default function AboutApp() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* GLOBAL FOOTER: Status sieci i technologii PWA */}
+      <div className="bg-slate-50 border-t border-slate-150 p-4 sm:px-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0 border border-indigo-100 shadow-2xs">
+              <Activity className="h-4.5 w-4.5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">Status sieci i technologii PWA</h4>
+              <p className="text-[10px] text-slate-500">Bieżąca diagnostyka środowiska i dostępności usług chmurowych Google AI Studio</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Network Indicator */}
+            <div className={`flex-1 md:flex-none px-3 py-1.5 rounded-lg border flex items-center justify-between md:justify-start gap-2.5 text-[11px] font-semibold shadow-3xs transition-all ${
+              isOnline 
+                ? "bg-emerald-50/60 border-emerald-100 text-emerald-800" 
+                : "bg-rose-50/60 border-rose-100 text-rose-800"
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-500 animate-ping" : "bg-rose-500"}`} />
+                <span>Internet: {isOnline ? "ONLINE" : "OFFLINE"}</span>
+              </div>
+              {isOnline ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+            </div>
+
+            {/* PWA Indicator */}
+            <div className={`flex-1 md:flex-none px-3 py-1.5 rounded-lg border flex items-center justify-between md:justify-start gap-2.5 text-[11px] font-semibold shadow-3xs transition-all ${
+              isStandalone 
+                ? "bg-emerald-50/60 border-emerald-100 text-emerald-800" 
+                : "bg-indigo-50/50 border-indigo-100 text-indigo-800"
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${isStandalone ? "bg-emerald-500 animate-pulse" : "bg-indigo-400"}`} />
+                <span>PWA: {isStandalone ? "ZAINSTALOWANO" : "PRZEGLĄDARKA"}</span>
+              </div>
+              <Globe className="h-3.5 w-3.5" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
