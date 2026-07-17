@@ -1307,7 +1307,7 @@ export default function AboutApp() {
                 <p className="text-xs text-slate-500 font-medium -mt-2">Projektant Oprogramowania & Specjalista ds. IT</p>
                 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Jestem pasjonatem nowoczesnych narzędzi IT i usprawniania procesów administracyjnych. Program SCANVENTORY powstał z potrzeby stworzenia intuicyjnego, niezawodnego i uniwersalnego systemu ewidencji sprzętu, który eliminuje tradycyjne, papierowe arkusze i mozolne, ręczne przepisywanie danych.
+                  Jestem pasjonatem nowoczesnych narzędzi IT i usprawniania procesów administracyjnych. Program SCANVENTORY powstał z potrzeby stworzenia intuicyjnego, niezawodnego i uniwersalnego systemu ewidencji sprzętu, który eliminuje tradycyjne, papierowe arkusze i ręczne przepisywanie danych.
                 </p>
 
                 <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-4 text-xs text-slate-600">
@@ -1320,52 +1320,107 @@ export default function AboutApp() {
             </div>
           </div>
         )}
-
-        {/* SECTION 3: REGULAMIN */}
         {activeSection === "terms" && (
           <div className="space-y-4 text-slate-600 text-xs leading-relaxed animate-in fade-in duration-150">
-            <h3 className="text-base font-bold text-slate-900 mb-2">Regulamin Użytkowania Systemu</h3>
+            <h3 className="text-base font-bold text-slate-900 mb-1">Regulamin i Polityka Prywatności</h3>
+            <p className="text-[11px] text-slate-500">
+              Wersja <strong>1.3.0</strong> · obowiązuje od <strong>17 lipca 2026 r.</strong>
+            </p>
             
-            <div className="space-y-3.5 max-h-[400px] overflow-y-auto pr-2">
+            <div className="p-5 bg-slate-50 border border-slate-150 rounded-xl space-y-4 max-h-[400px] overflow-y-auto text-left pr-2">
               <div>
-                <h4 className="font-bold text-slate-800 mb-1">§1 Postanowienia ogólne</h4>
-                <p>Niniejszy regulamin określa zasady korzystania z systemu SCANVENTORY, służącego do inwentaryzacji i ewidencjonowania zasobów sprzętowych.</p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-800 mb-1">§2 Odpowiedzialność za dane i kopie zapasowe</h4>
-                <p>
-                  Dane inwentaryzacyjne są domyślnie zapisywane w lokalnej pamięci podręcznej przeglądarki użytkownika (LocalStorage). 
-                  W przypadku wyczyszczenia pamięci podręcznej przeglądarki lub awarii systemu na danym urządzeniu, istnieje ryzyko utraty niezapisanych lokalnie zmian.
-                  Użytkownik jest zobowiązany do systematycznego wykonywania kopii zapasowych poprzez pobranie danych za pomocą wbudowanej funkcji <strong>„Kopia zapasowa (JSON)”</strong>.
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 1. Postanowienia ogólne</h4>
+                <p className="space-y-1">
+                  1. Niniejszy Regulamin określa zasady korzystania z aplikacji <strong>„SCANVENTORY”</strong> (dalej: „Aplikacja”), dostępnej pod adresem <strong>{window.location.origin}</strong>.<br />
+                  2. Właścicielem, twórcą i jedynym autorem Aplikacji jest <strong>mgr Krzysztof Jureczek</strong> (dalej: „Autor”).<br />
+                  3. Aplikacja dystrybuowana jest na warunkach <strong>Wolnej Licencji Domowo-Edukacyjnej (Zastrzeżonej)</strong> — pełna treść w sekcji „Licencja”. Regulamin i Licencja stanowią całość i obowiązują łącznie.<br />
+                  4. Korzystanie z Aplikacji oznacza pełną akceptację niniejszego Regulaminu oraz Licencji.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1">§3 Praca wielourządzeniowa i scalanie</h4>
-                <p>
-                  System umożliwia jednoczesną inwentaryzację przy użyciu wielu niezależnych urządzeń (np. smartfonów). 
-                  Do poprawnego scalenia danych na komputerze nadrzędnym zaleca się wyeksportowanie danych z telefonów w formacie CSV, 
-                  a następnie wgranie ich za pomocą modułu „Importuj CSV” na stacji głównej z opcją <strong>„Aktualizuj istniejące i dodaj nowe”</strong>.
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 2. Przeznaczenie Aplikacji</h4>
+                <p className="space-y-1">
+                  Aplikacja przeznaczona jest wyłącznie do:<br />
+                  1. <strong>Użytku domowego / prywatnego</strong> — korzystanie przez osoby fizyczne w celach własnych, w tym rozrywkowych i samokształceniowych.<br />
+                  2. <strong>Użytku edukacyjnego</strong> — wykorzystanie w placówkach oświatowych (przedszkola, szkoły, uczelnie, świetlice, placówki opiekuńczo-wychowawcze i terapeutyczne) w ramach zajęć dydaktycznych.<br />
+                  Wszelkie inne zastosowania, w tym komercyjne, wymagają uprzedniej pisemnej zgody Autora.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1">§4 Ochrona prywatności i AI</h4>
-                <div className="space-y-2">
-                  <p>
-                    Funkcja automatycznego odczytu specyfikacji z naklejek (OCR) przetwarza jedynie przesyłane zdjęcia tabliczek znamionowych w celu ekstrakcji parametrów technicznych przy użyciu technologii sztucznej inteligencji. 
-                  </p>
-                  <p>
-                    <strong>Bezpieczeństwo kluczy API:</strong> W darmowym „Trybie Bezpośrednim (Client-Side)”, Twój klucz Gemini API podawany w ustawieniach formularza jest przechowywany bezpiecznie wyłącznie w lokalnej pamięci Twojej przeglądarki (<span className="font-mono">localStorage</span>). Zapytania i zdjęcia są przekazywane bezpośrednio z Twojego urządzenia do oficjalnych i bezpiecznych serwerów Google (Google AI Studio) przy użyciu szyfrowanego połączenia HTTPS. Nie uczestniczą w tym żadne serwery pośredniczące.
-                  </p>
-                  <p>
-                    <strong>Przetwarzanie zdjęć:</strong> Zdjęcia robione aparatem lub wgrywane z dysku są przesyłane jako dane binarne wyłącznie w celu odczytu parametrów i natychmiast po zwróceniu wyniku OCR przez AI są usuwane z pamięci podręcznej aplikacji. SCANVENTORY nie archiwizuje Twoich zdjęć na żadnych zewnętrznych hostingach.
-                  </p>
-                  <p>
-                    <strong>Regulacje Google AI:</strong> Korzystając z bezpłatnego klucza API, przesyłane dane podlegają postanowieniom dotyczącym polityki prywatności platformy Google AI Studio. Aby uniknąć naruszeń prywatności, surowo zabrania się skanowania dokumentów zawierających dane osobowe, dowody tożsamości lub poufne dane firmowe – program przeznaczony jest wyłącznie do skanowania oznaczeń fabrycznych sprzętu IT.
-                  </p>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 3. Zasady korzystania</h4>
+                <p className="space-y-1">
+                  1. Aplikacja jest całkowicie bezpłatna dla zakresu wskazanego w § 2.<br />
+                  2. Aplikacja nie zawiera reklam, mikropłatności ani płatnych subskrypcji.<br />
+                  3. Użytkownik zobowiązuje się korzystać z Aplikacji zgodnie z jej przeznaczeniem oraz obowiązującym prawem.<br />
+                  4. Zabronione jest podejmowanie działań mogących zakłócić działanie Aplikacji lub narazić innych użytkowników na szkodę.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 4. Prawa autorskie i licencja</h4>
+                <p className="mb-2">
+                  Wszelkie prawa do Aplikacji — kod źródłowy, interfejs graficzny, projekt wizualny, treści i dokumentacja — należą wyłącznie do Autora i są chronione prawem autorskim.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white border border-slate-150 rounded-lg">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-extrabold text-rose-600 uppercase tracking-wide block">❌ Zabronione</span>
+                    <p className="text-[11px] text-slate-500">
+                      Kopiowanie, modyfikowanie, dekompilowanie, rozpowszechnianie, sprzedaż lub komercjalizacja Aplikacji bądź jej części bez pisemnej zgody Autora.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-wide block">✅ Dozwolone</span>
+                    <p className="text-[11px] text-slate-500">
+                      Korzystanie z Aplikacji zgodnie z jej przeznaczeniem (§ 2) oraz udostępnianie linku do Aplikacji innym osobom.
+                    </p>
+                  </div>
                 </div>
+                <p className="mt-2">
+                  Szczegółowe warunki licencyjne określa sekcja „Licencja”. W sprawach zgody na inne wykorzystanie prosimy o kontakt z Autorem.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 5. Dane i prywatność (RODO/GDPR)</h4>
+                <p className="space-y-1">
+                  1. Aplikacja <strong>nie wymaga rejestracji ani logowania</strong> i nie zbiera danych osobowych na zewnętrznych serwerach.<br />
+                  2. Dane wprowadzane do Aplikacji (np. baza danych urządzeń IT, dane firmy, konfiguracja naklejek, klucz Gemini API) przechowywane są <strong>wyłącznie lokalnie w pamięci przeglądarki użytkownika</strong> (<span className="font-mono">localStorage</span>) i nigdy nie opuszczają jego urządzenia.<br />
+                  3. Administratorem danych osobowych wprowadzanych do programu (jeśli dotyczy) jest wyłącznie Użytkownik końcowy (np. szkoła, nauczyciel, opiekun) — Autor nie ma technicznego dostępu do tych danych.<br />
+                  4. Aplikacja nie używa plików cookie, zewnętrznych narzędzi analitycznych ani reklamowych systemów śledzenia.<br />
+                  5. Użytkownik może w każdej chwili usunąć swoje dane, czyszcząc dane przeglądarki lub korzystając z funkcji czyszczenia bazy danych w aplikacji.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 6. Odpowiedzialność</h4>
+                <p className="space-y-1">
+                  1. Aplikacja udostępniana jest w stanie „takim, jakim jest” (<em>as is</em>), bez jakichkolwiek gwarancji.<br />
+                  2. Autor nie ponosi odpowiedzialności za utratę danych, błędy działania, awarie sprzętu lub szkody wynikające z korzystania bądź niemożności korzystania z Aplikacji.<br />
+                  3. Zaleca się regularne tworzenie kopii zapasowych danych poprzez funkcję eksportu kopii JSON/CSV.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 7. Zmiany Regulaminu</h4>
+                <p>
+                  Autor zastrzega sobie prawo do zmiany Regulaminu oraz aktualizacji Aplikacji bez uprzedzenia. Dalsze korzystanie z Aplikacji po opublikowaniu zmian oznacza ich akceptację.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 8. Postanowienia końcowe</h4>
+                <p>
+                  W sprawach nieuregulowanych niniejszym Regulaminem zastosowanie mają przepisy prawa polskiego, w szczególności Kodeksu cywilnego oraz ustawy o prawie autorskim i prawach pokrewnych.
+                </p>
+                <p className="mt-2 font-semibold text-slate-700">
+                  Kontakt: kjureczek@proton.me · github.com/krzjur-oss
+                </p>
+              </div>
+
+              <div className="border-t border-slate-150 pt-3 text-center text-[10px] text-slate-400 font-bold">
+                © 2026 Krzysztof Jureczek · Wszelkie prawa zastrzeżone
               </div>
             </div>
           </div>
@@ -1373,46 +1428,101 @@ export default function AboutApp() {
 
         {/* SECTION 4: LICENCJA */}
         {activeSection === "license" && (
-          <div className="space-y-4 animate-in fade-in duration-150">
-            <h3 className="text-base font-bold text-slate-900 mb-1">Informacje Licencyjne (EULA)</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Program <strong>SCANVENTORY</strong> udostępniany jest do bezpłatnego użytku (zarówno prywatnego, edukacyjnego, jak i administracyjnego), lecz z zachowaniem ścisłych ograniczeń dotyczących praw autorskich, kopiowania, modyfikowania oraz odsprzedaży.
+          <div className="space-y-4 text-slate-600 text-xs leading-relaxed animate-in fade-in duration-150">
+            <h3 className="text-base font-bold text-slate-900 mb-1">Licencja Użytkowania Oprogramowania</h3>
+            <p className="text-[11px] text-slate-500">
+              <strong>Wolna Licencja Domowo-Edukacyjna (Zastrzeżona) — WLDE</strong>
             </p>
 
-            <div className="p-5 bg-slate-50 border border-slate-150 rounded-xl space-y-4 max-h-[400px] overflow-y-auto text-left">
+            <div className="p-5 bg-slate-50 border border-slate-150 rounded-xl space-y-4 max-h-[400px] overflow-y-auto text-left pr-2">
               <div className="border-b border-slate-150 pb-2.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Typ licencji</span>
-                <p className="text-xs font-bold text-slate-800">Darmowy użytek (zastrzeżony) / Proprietary EULA</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Projekt</span>
+                <p className="text-xs font-bold text-slate-800">SCANVENTORY (wersja 1.3.0 i wyższe)</p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Właściciel praw autorskich i twórca: <strong>mgr Krzysztof Jureczek</strong><br />
+                  Copyright © 2026 Krzysztof Jureczek. Wszelkie prawa zastrzeżone.<br />
+                  Kontakt: kjureczek@proton.me · GitHub: github.com/krzjur-oss
+                </p>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
-                <div>
-                  <h4 className="font-bold text-slate-800 mb-1">1. Dozwolony użytek</h4>
-                  <p>Licencja zezwala na bezpłatne korzystanie, uruchamianie i instalowanie programu na dowolnej liczbie urządzeń do celów prywatnych, oświatowych, administracyjnych i operacyjnych.</p>
-                </div>
+              <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
+                <h4 className="font-bold text-indigo-950 mb-1 uppercase text-[10px] tracking-wider">Preambuła</h4>
+                <p className="text-[11px] text-indigo-900 leading-normal">
+                  Niniejsza licencja ma na celu zabezpieczenie niekomercyjnego charakteru projektu <strong>„SCANVENTORY”</strong>. Intencją Autora jest bezpłatne udostępnienie aplikacji do użytku domowego (prywatnego) oraz placówkom edukacyjnym, przy jednoczesnym pełnym zachowaniu praw autorskich, integralności kodu źródłowego oraz zakazie jakiejkolwiek komercjalizacji, kopiowania, modyfikacji i rozpowszechniania Oprogramowania bez pisemnej zgody Autora.
+                </p>
+              </div>
 
-                <div className="p-3.5 bg-rose-50/70 border border-rose-150 rounded-lg space-y-2 text-rose-950">
-                  <p className="font-bold text-[10px] uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
-                    <Shield className="h-4 w-4 text-rose-600 shrink-0" />
-                    Czego absolutnie zabrania się bez pisemnej zgody właściciela:
-                  </p>
-                  <ul className="list-disc pl-4 text-[11px] space-y-1 text-rose-900">
-                    <li><strong>Kopiowania i rozpowszechniania</strong> kodu źródłowego, plików wykonywalnych lub skompilowanego Programu osobom trzecim.</li>
-                    <li><strong>Modyfikowania i wprowadzania zmian</strong> w kodzie źródłowym, adaptacji, tłumaczenia, inżynierii wstecznej (reverse engineering), dekompilacji lub tworzenia utworów zależnych.</li>
-                    <li><strong>Komercjalizacji i wykorzystania komercyjnego</strong> Programu do celów zarobkowych lub świadczenia płatnych usług osobom trzecim.</li>
-                    <li><strong>Sprzedaży, wynajmu i licencjonowania</strong> Programu, oferowania go jako płatnego oprogramowania lub dołączania jako element pakietów handlowych.</li>
-                  </ul>
-                </div>
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 1. DEFINICJE</h4>
+                <p className="space-y-1">
+                  1. <strong>Oprogramowanie</strong> – aplikacja „SCANVENTORY” wraz z całym kodem źródłowym, plikami wykonywalnymi, grafiką, zasobami multimedialnymi oraz dokumentacją.<br />
+                  2. <strong>Autor / Licencjodawca</strong> – mgr Krzysztof Jureczek, jedyny twórca i wyłączny dysponent autorskich praw majątkowych i osobistych do Oprogramowania.<br />
+                  3. <strong>Użytkownik / Licencjobiorca</strong> – każda osoba fizyczna korzystająca z Oprogramowania w celach domowych/prywatnych, a także każda szkoła, przedszkole, uczelnia lub inna placówka oświatowo-wychowawcza korzystająca z Oprogramowania w celach dydaktycznych.
+                </p>
+              </div>
 
-                <div>
-                  <h4 className="font-bold text-slate-800 mb-1">2. Własność intelektualna</h4>
-                  <p>Wszystkie prawa autorskie do Programu oraz nazwy SCANVENTORY należą wyłącznie do autora: <strong>Krzysztof Jureczek</strong>. Oprogramowanie nie jest sprzedawane, lecz licencjonowane.</p>
-                </div>
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 2. DOZWOLONY UŻYTEK (BEZPŁATNY)</h4>
+                <p className="mb-1">
+                  Autor udziela Użytkownikowi bezpłatnej, niewyłącznej, nieprzenoszalnej i ograniczonej licencji na korzystanie z Oprogramowania wyłącznie w następujących celach:
+                </p>
+                <p className="space-y-1 pl-1">
+                  1. <strong>Użytek domowy / prywatny</strong> – instalowanie i uruchamianie Oprogramowania przez osoby fizyczne na własny, niekomercyjny użytek, w tym cele rozrywkowe i samokształceniowe.<br />
+                  2. <strong>Użytek edukacyjny</strong> – wykorzystanie Oprogramowania w placówkach oświatowych (przedszkola, szkoły podstawowe i ponadpodstawowe, uczelnie wyższe, świetlice, placówki opiekuńczo-wychowawcze i terapeutyczne) na zajęciach, lekcjach, wykładach i kołach zainteresowań.<br />
+                  3. <strong>Instalacja lokalna</strong> – uruchamianie i przechowywanie Oprogramowania (w tym w trybie offline/PWA, jeśli dotyczy) na urządzeniach własnych Użytkownika lub placówki.<br />
+                  4. <strong>Prezentacje niekomercyjne</strong> – publiczne demonstrowanie działania Oprogramowania w celach popularyzacji nauki i technologii, pod warunkiem wskazania autorstwa.
+                </p>
+              </div>
 
-                <div>
-                  <h4 className="font-bold text-slate-800 mb-1">3. Wyłączenie odpowiedzialności</h4>
-                  <p>Oprogramowanie dostarczane jest w stanie, w jakim się znajduje („AS IS”), bez jakiejkolwiek gwarancji. Autor nie ponosi odpowiedzialności za ewentualną utratę danych lub szkody powstałe w wyniku korzystania z programu.</p>
-                </div>
+              <div className="p-3.5 bg-rose-50/70 border border-rose-150 rounded-lg space-y-2 text-rose-950">
+                <h4 className="font-bold text-[10px] uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                  <Shield className="h-4 w-4 text-rose-600 shrink-0" />
+                  § 3. ZAKAZY I OGRANICZENIA
+                </h4>
+                <p className="text-[11px] text-rose-900 leading-normal">
+                  Wszelkie działania wykraczające poza § 2 wymagają uprzedniej, pisemnej zgody Autora. W szczególności <strong>surowo zabrania się</strong>:
+                </p>
+                <ul className="list-disc pl-4 text-[11px] space-y-1 text-rose-900">
+                  <li><strong>Kopiowania kodu</strong> – kopiowania, powielania, pobierania w celu redystrybucji, dekompilacji lub inżynierii wstecznej kodu źródłowego lub skompilowanych plików Oprogramowania.</li>
+                  <li><strong>Modyfikacji</strong> – wprowadzania jakichkolwiek zmian w kodzie źródłowym, interfejsie, grafice, logotypach, treściach lub innych zasobach Oprogramowania.</li>
+                  <li><strong>Rozpowszechniania</strong> – dystrybuowania, udostępniania, sublicencjonowania, wynajmu, publikowania kopii lub „forków” Oprogramowania osobom trzecim, w tym poprzez repozytoria (GitHub, GitLab), sklepy z aplikacjami lub inne serwery pobierania.</li>
+                  <li><strong>Sprzedaży i komercjalizacji</strong> – sprzedaży, pobierania jakichkolwiek opłat (bezpośrednich lub pośrednich) za dostęp, instalację lub użytkowanie Oprogramowania, umieszczania go w płatnych pakietach, za bramkami płatniczymi, w serwisach z reklamami czerpiącymi zysk z ruchu użytkowników, ani wykorzystywania go do świadczenia odpłatnych usług.</li>
+                  <li><strong>Usuwania oznaczeń autorskich</strong> – usuwania, ukrywania lub modyfikowania informacji o Autorze, prawach autorskich, logotypach oraz odnośników do niniejszej licencji.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 4. WŁASNOŚĆ INTELEKTUALNA I INTEGRALNOŚĆ</h4>
+                <p className="space-y-1">
+                  1. Oprogramowanie oraz wszelkie związane z nim prawa autorskie i prawa własności intelektualnej stanowią wyłączną własność Autora.<br />
+                  2. Niniejsza licencja nie przenosi na Użytkownika żadnych praw własności do Oprogramowania — udziela wyłącznie prawa do bezpłatnego korzystania zgodnie z § 2.<br />
+                  3. Użytkownik zobowiązuje się zachować w niezmienionym stanie wszystkie oznaczenia praw autorskich i informacje o Autorze zawarte w Oprogramowaniu.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 5. WYŁĄCZENIE ODPOWIEDZIALNOŚCI (AS IS)</h4>
+                <p className="space-y-1">
+                  1. Oprogramowanie dostarczane jest w stanie, w jakim się znajduje („AS IS”), bez jakichkolwiek gwarancji, wyraźnych lub dorozumianych, w tym gwarancji przydatności do określonego celu czy nieprzerwanego, bezbłędnego działania.<br />
+                  2. Autor nie ponosi odpowiedzialności za jakiekolwiek szkody bezpośrednie, pośrednie lub następcze wynikłe z użytkowania lub niemożności użytkowania Oprogramowania, w tym utratę danych.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 6. ROZWIĄZANIE LICENCJI</h4>
+                <p>
+                  Naruszenie któregokolwiek z warunków niniejszej licencji skutkuje jej natychmiastowym i automatycznym wygaśnięciem. Użytkownik zobowiązany jest wówczas do trwałego usunięcia wszystkich kopii Oprogramowania ze swoich nośników i systemów.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-1 text-sm">§ 7. POSTANOWIENIA KOŃCOWE</h4>
+                <p className="mb-2">
+                  W sprawach nieuregulowanych niniejszą licencją zastosowanie mają przepisy ustawy z dnia 4 lutego 1994 r. o prawie autorskim i prawach pokrewnych oraz Kodeksu cywilnego RP. Wszelkie spory rozstrzyga sąd właściwy dla siedziby Licencjodawcy.
+                </p>
+                <p className="font-semibold text-[10px] text-slate-500 text-right uppercase tracking-wider">
+                  Kraków, lipiec 2026 r.
+                </p>
               </div>
             </div>
           </div>
