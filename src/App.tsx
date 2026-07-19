@@ -835,6 +835,19 @@ function AppContent() {
           </div>
         </main>
       </div>
+
+      {/* Floating Action Button (FAB) for PWA Installation on Desktop */}
+      {!isStandalone && (
+        <button
+          onClick={handleInstallClick}
+          className="fixed bottom-8 right-8 z-40 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-2 px-5 py-3.5 rounded-full shadow-lg shadow-blue-500/20 border border-blue-400/30 font-bold text-xs tracking-wide hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          id="pwa-install-fab-desktop"
+          title="Zainstaluj aplikację na komputerze"
+        >
+          <Download className="h-4 w-4 text-blue-200 animate-bounce" />
+          <span>Zainstaluj wersję PC</span>
+        </button>
+      )}
     </div>
   );
 }
