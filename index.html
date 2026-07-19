@@ -4,18 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inwentaryzacja Sprzętu Komputerowego</title>
-    <link rel="manifest" href="manifest.json" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#2563eb" />
-    <link rel="apple-touch-icon" href="icon.jpg" />
-    <script type="module" crossorigin src="./assets/index-CMTUpnM-.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-LNOZzazG.css">
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <script type="module" crossorigin src="./assets/index-B-okKg-l.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BV-YyfIu.css">
   </head>
   <body>
     <div id="root"></div>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
+          navigator.serviceWorker.register('/sw.js')
             .then((reg) => {
               console.log('Service Worker zarejestrowany pomyślnie:', reg.scope);
             })
